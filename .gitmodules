@@ -1,0 +1,3 @@
+[submodule "dyn-dialect"]
+	path = dyn-dialect
+	url = https://github.com/opencompl/dyn-dialect
