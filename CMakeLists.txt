@@ -39,6 +39,7 @@ include_directories(
                     ${PROJECT_SOURCE_DIR}/mlir-enumerate
                     ${PROJECT_BINARY_DIR}/dyn-dialect/include
                     ${PROJECT_SOURCE_DIR}/dyn-dialect/include
+                    ${PROJECT_SOURCE_DIR}/guided-tree-search/include
 )
 
 link_directories(${LLVM_BUILD_LIBRARY_DIR})

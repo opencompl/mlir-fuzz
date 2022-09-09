@@ -1,3 +1,6 @@
 [submodule "dyn-dialect"]
 	path = dyn-dialect
 	url = https://github.com/opencompl/dyn-dialect
+[submodule "guided-tree-search"]
+	path = guided-tree-search
+	url = https://github.com/regehr/guided-tree-search
