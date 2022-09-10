@@ -90,6 +90,7 @@ void addOperation(GeneratorInfo &info) {
   // Create the operation.
   auto *op = builder.create(UnknownLoc::get(ctx), StringAttr::get(ctx, opName),
                             {lhs, rhs}, {builder.getIntegerType(32)});
+  info.addDominatingValue(op->getResult(0));
 }
 
 /// Create a random program, given the decisions taken from chooser.
