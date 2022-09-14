@@ -135,7 +135,6 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
 /// Parse a file containing the dialects that we want to use.
 llvm::Optional<OwningOpRef<ModuleOp>>
 parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
-  llvm::errs() << "Here \n" << inputFilename << "\n";
   // Set up the input file.
   std::string errorMessage;
   auto file = openInputFile(inputFilename, &errorMessage);
@@ -144,7 +143,6 @@ parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
     return llvm::None;
   }
 
-  llvm::errs() << "There?\n";
   // Tell sourceMgr about this buffer, which is what the parser will pick
   // up.
   llvm::SourceMgr sourceMgr;
