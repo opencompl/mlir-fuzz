@@ -15,6 +15,12 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/InitAllDialects.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Support/FileUtilities.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
 
 using namespace mlir;
 using namespace irdl;
@@ -126,7 +132,44 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   return module;
 }
 
+/// Parse a file containing the dialects that we want to use.
+llvm::Optional<OwningOpRef<ModuleOp>>
+parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
+  llvm::errs() << "Here \n" << inputFilename << "\n";
+  // Set up the input file.
+  std::string errorMessage;
+  auto file = openInputFile(inputFilename, &errorMessage);
+  if (!file) {
+    llvm::errs() << errorMessage << "\n";
+    return llvm::None;
+  }
+
+  llvm::errs() << "There?\n";
+  // Tell sourceMgr about this buffer, which is what the parser will pick
+  // up.
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(file), SMLoc());
+
+  // Parse the IRDL file.
+  bool wasThreadingEnabled = ctx.isMultithreadingEnabled();
+  ctx.disableMultithreading();
+
+  // Parse the input file and reset the context threading state.
+  OwningOpRef<ModuleOp> module(parseSourceFile<ModuleOp>(sourceMgr, &ctx));
+  ctx.enableMultithreading(wasThreadingEnabled);
+
+  return module;
+}
+
 int main(int argc, char **argv) {
+
+  // The IRDL file containing the dialects that we want to generate
+  static llvm::cl::opt<std::string> inputFilename(
+      llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
+
+  llvm::InitLLVM y(argc, argv);
+  llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
+
   MLIRContext ctx;
 
   // Register all dialects
@@ -135,6 +178,17 @@ int main(int argc, char **argv) {
   ctx.appendDialectRegistry(registry);
   ctx.getOrLoadDialect<irdl::IRDLDialect>();
   ctx.loadAllAvailableDialects();
+
+  llvm::errs() << "Parsing IRDL file" << '\n';
+
+  // Try to parse the dialects.
+  auto optDialects = parseIRDLDialects(ctx, inputFilename);
+  if (!optDialects)
+    return 1;
+
+  // Get the dialects
+  auto &dialects = optDialects.value();
+  dialects->dump();
 
   auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {

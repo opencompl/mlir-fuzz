@@ -1,0 +1,176 @@
+module {
+  irdl.dialect arith {
+    irdl.operation arith.addf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.addi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.addui_carry {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(sum: builtin.integer_type, carry: builtin.integer_type)
+    }
+    irdl.operation arith.andi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.bitcast {
+      irdl.operands(in: AnyOf<builtin.integer_type, builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(out: AnyOf<builtin.integer_type, builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.ceildivsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.ceildivui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.cmpf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.cmpi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.constant {
+      irdl.operands()
+      irdl.results(result: AnyOf<builtin.integer_type, builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.divf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.divsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.divui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.extf {
+      irdl.operands(in: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(out: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.extsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.extui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.fptosi {
+      irdl.operands(in: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(out: builtin.integer_type)
+    }
+    irdl.operation arith.fptoui {
+      irdl.operands(in: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(out: builtin.integer_type)
+    }
+    irdl.operation arith.floordivsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.index_cast {
+      irdl.operands(in: builtin.integer_type)
+      irdl.results(out: builtin.integer_type)
+    }
+    irdl.operation arith.maxf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.maxsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.maxui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.minf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.minsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.minui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.mulf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.muli {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.negf {
+      irdl.operands(operand: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.ori {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.remf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.remsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.remui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.sitofp {
+      irdl.operands(in: builtin.integer_type)
+      irdl.results(out: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.shli {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.shrsi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.shrui {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.subf {
+      irdl.operands(lhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>, rhs: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(result: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.subi {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.truncf {
+      irdl.operands(in: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+      irdl.results(out: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.trunci {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+    irdl.operation arith.uitofp {
+      irdl.operands(in: builtin.integer_type)
+      irdl.results(out: AnyOf<builtin.bf16, builtin.f16, builtin.f32, builtin.f64, builtin.f80, builtin.f128>)
+    }
+    irdl.operation arith.xori {
+      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.results(result: builtin.integer_type)
+    }
+  }
+}
