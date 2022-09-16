@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -31,6 +32,9 @@ struct GeneratorInfo {
   /// The chooser, which will chose which path to take in the decision tree.
   tree_guide::Chooser *chooser;
 
+  /// All available ops that can be used by the fuzzer.
+  std::vector<OperationOp> availableOps;
+
   /// A builder set to the end of the function.
   OpBuilder builder;
 
@@ -42,8 +46,10 @@ struct GeneratorInfo {
   /// need to remove elements from this set.
   llvm::DenseMap<Type, std::vector<Value>> dominatingValues;
 
-  GeneratorInfo(tree_guide::Chooser *chooser, OpBuilder builder)
-      : chooser(chooser), builder(builder) {}
+  GeneratorInfo(tree_guide::Chooser *chooser,
+                std::vector<OperationOp> &&availableOps, OpBuilder builder)
+      : chooser(chooser), availableOps(std::move(availableOps)),
+        builder(builder) {}
 
   /// Add a value to the list of available values.
   void addDominatingValue(Value value) {
@@ -84,24 +90,27 @@ Value getValue(GeneratorInfo &info, Type type) {
 void addOperation(GeneratorInfo &info) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
-  std::vector<StringRef> availableOps = {"arith.addi", "arith.muli"};
 
   // Choose one of the binary operations.
-  auto opName = availableOps[info.chooser->choose(availableOps.size())];
+  auto op = info.availableOps[info.chooser->choose(info.availableOps.size())];
+
+  auto operands = op.getOp<OperandsOp>();
+  auto results = op.getOp<ResultsOp>();
 
   // Choose the operands.
   auto lhs = getValue(info, builder.getIntegerType(32));
   auto rhs = getValue(info, builder.getIntegerType(32));
 
   // Create the operation.
-  auto *op = builder.create(UnknownLoc::get(ctx), StringAttr::get(ctx, opName),
-                            {lhs, rhs}, {builder.getIntegerType(32)});
-  info.addDominatingValue(op->getResult(0));
+  auto *operation = builder.create(UnknownLoc::get(ctx), op.nameAttr(),
+                                   {lhs, rhs}, {builder.getIntegerType(32)});
+  info.addDominatingValue(operation->getResult(0));
 }
 
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
+                                    OwningOpRef<ModuleOp> &dialects,
                                     tree_guide::Chooser *chooser, int fuel) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
@@ -119,8 +128,12 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
+  std::vector<OperationOp> availableOps = {};
+  dialects->walk(
+      [&availableOps](OperationOp op) { availableOps.push_back(op); });
+
   // Create the generator info
-  GeneratorInfo info(chooser, builder);
+  GeneratorInfo info(chooser, std::move(availableOps), builder);
 
   // Select how many operations we want to generate, and generate them.
   auto numOps = chooser->choose(fuel + 1);
@@ -190,7 +203,9 @@ int main(int argc, char **argv) {
 
   auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, chooser.get(), 2);
+    auto module = createProgram(ctx, dialects, chooser.get(), 2);
     module->dump();
+    verify(*module, true);
+    llvm::errs() << "\n";
   }
 }
