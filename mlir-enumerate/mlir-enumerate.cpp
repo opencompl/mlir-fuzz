@@ -190,8 +190,6 @@ int main(int argc, char **argv) {
   ctx.getOrLoadDialect<irdl::IRDLDialect>();
   ctx.loadAllAvailableDialects();
 
-  llvm::errs() << "Parsing IRDL file" << '\n';
-
   // Try to parse the dialects.
   auto optDialects = parseIRDLDialects(ctx, inputFilename);
   if (!optDialects)
