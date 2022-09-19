@@ -94,7 +94,9 @@ Value getValue(GeneratorInfo &info, Type type) {
 /// Get the types that the fuzzer supports.
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getIntegerType(32)};
+  return {builder.getIntegerType(1), builder.getIntegerType(32),
+          builder.getIntegerType(64), builder.getIntegerType(17),
+          builder.getIntegerType(3)};
 }
 
 /// Get the types that the constraint can support.
