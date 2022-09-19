@@ -155,7 +155,7 @@ void addOperation(GeneratorInfo &info) {
     }
   }
 
-  auto resultDefs = op.getOp<OperandsOp>();
+  auto resultDefs = op.getOp<ResultsOp>();
   SmallVector<Type> resultTypes = {};
   if (resultDefs) {
     for (auto resultAttr : resultDefs->params()) {
