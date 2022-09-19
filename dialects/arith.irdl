@@ -10,7 +10,7 @@ module {
     }
     irdl.operation arith.addui_carry {
       irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
-      irdl.results(sum: builtin.integer_type, carry: builtin.integer_type)
+      irdl.results(sum: builtin.integer_type, carry: i1)
     }
     irdl.operation arith.andi {
       irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
@@ -57,11 +57,11 @@ module {
       irdl.results(out: AnyOf<bf16, f16, f32, f64, f80, f128>)
     }
     irdl.operation arith.extsi {
-      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.operands(lhs: builtin.integer_type)
       irdl.results(result: builtin.integer_type)
     }
     irdl.operation arith.extui {
-      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.operands(lhs: builtin.integer_type)
       irdl.results(result: builtin.integer_type)
     }
     irdl.operation arith.fptosi {
@@ -161,7 +161,7 @@ module {
       irdl.results(out: AnyOf<bf16, f16, f32, f64, f80, f128>)
     }
     irdl.operation arith.trunci {
-      irdl.operands(lhs: builtin.integer_type, rhs: builtin.integer_type)
+      irdl.operands(lhs: builtin.integer_type)
       irdl.results(result: builtin.integer_type)
     }
     irdl.operation arith.uitofp {
