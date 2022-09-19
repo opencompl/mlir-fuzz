@@ -312,11 +312,11 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   registerAllDialects(registry);
   ctx.appendDialectRegistry(registry);
-  ctx.getOrLoadDialect<irdl::IRDLDialect>();
+  auto *irdlDialect = ctx.getOrLoadDialect<irdl::IRDLDialect>();
   ctx.loadAllAvailableDialects();
 
-  IRDLContext irdlContext;
-  irdlContext.addTypeWrapper(std::make_unique<IntegerTypeWrapper>());
+  irdlDialect->addTypeWrapper(std::make_unique<IntegerTypeWrapper>());
+  auto &irdlContext = irdlDialect->irdlContext;
 
   // Try to parse the dialects.
   auto optDialects = parseIRDLDialects(ctx, inputFilename);
