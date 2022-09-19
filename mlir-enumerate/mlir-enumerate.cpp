@@ -338,8 +338,21 @@ int main(int argc, char **argv) {
   while (auto chooser = guide.makeChooser()) {
     auto module =
         createProgram(ctx, availableOps, irdlContext, chooser.get(), 2);
+    // Some programs still won't verify, because IRDL is not expressive enough
+    // to represent all constraints.
+    // For now, we just discard those programs. Hopefully, there should be a
+    // majority of programs that are verifying.
+    {
+      // We discard diagnostics here, so we don't print the errors of the
+      // programs that are not verifying.
+      ScopedDiagnosticHandler diagHandler(
+          &ctx, [](Diagnostic &) { return success(); });
+      if (verify(*module, true).succeeded())
+        continue;
+    }
+
+    // For now, we are just printing the generated program.
     module->dump();
-    (void)verify(*module, true);
     llvm::errs() << "\n";
   }
 }
