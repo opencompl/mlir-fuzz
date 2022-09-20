@@ -349,7 +349,7 @@ int main(int argc, char **argv) {
       // programs that are not verifying.
       ScopedDiagnosticHandler diagHandler(
           &ctx, [](Diagnostic &) { return success(); });
-      if (verify(*module, true).succeeded())
+      if (verify(*module, true).failed())
         continue;
     }
 
