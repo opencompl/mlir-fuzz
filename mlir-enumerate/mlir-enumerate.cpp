@@ -346,12 +346,6 @@ int main(int argc, char **argv) {
 
   auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {
-    // Print the percentage of programs that are verifying
-    llvm::errs() << "Generated " << programCounter << " programs, "
-                 << (((float)correctProgramCounter / (float)programCounter) *
-                     100.0f)
-                 << "% verifying \n\n\n";
-
     auto module =
         createProgram(ctx, availableOps, irdlContext, chooser.get(), 2);
     programCounter += 1;
@@ -368,6 +362,12 @@ int main(int argc, char **argv) {
         continue;
     }
     correctProgramCounter += 1;
+
+    // Print the percentage of programs that are verifying
+    llvm::errs() << "Generated " << programCounter << " programs, "
+                 << (((float)correctProgramCounter / (float)programCounter) *
+                     100.0f)
+                 << "% verifying \n\n\n";
 
     if (outputFolder == "-") {
       module->dump();
