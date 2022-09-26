@@ -336,10 +336,22 @@ int main(int argc, char **argv) {
       availableOps.push_back(op);
   });
 
+  size_t programCounter = 0;
+  size_t correctProgramCounter = 0;
+
   auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {
+    if (programCounter != 0 && programCounter % 1000 == 0) {
+      // Print the percentage of programs that are verifying
+      llvm::errs() << "Generated " << programCounter << " programs, "
+                   << (((float)correctProgramCounter / (float)programCounter) *
+                       100.0f)
+                   << "% verifying \n\n\n";
+    }
+
     auto module =
         createProgram(ctx, availableOps, irdlContext, chooser.get(), 2);
+    programCounter += 1;
     // Some programs still won't verify, because IRDL is not expressive enough
     // to represent all constraints.
     // For now, we just discard those programs. Hopefully, there should be a
@@ -352,9 +364,10 @@ int main(int argc, char **argv) {
       if (verify(*module, true).failed())
         continue;
     }
+    correctProgramCounter += 1;
 
     // For now, we are just printing the generated program.
-    module->dump();
-    llvm::errs() << "\n";
+    // module->dump();
+    // llvm::errs() << "\n";
   }
 }
