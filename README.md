@@ -13,3 +13,9 @@ IRDL and to avoid generating programs that do not verify.
   - `./utils/setup.sh`
 - Build the different tools (only mlir-enumerate for now)
   - `./utils/build.sh`
+
+## Running
+
+`./build/bin/mlir-enumerate dialects/arith.irdl -o generated` will run the
+enumerator with the `arith` dialect, and generate the programs in the
+`generated` folder.
