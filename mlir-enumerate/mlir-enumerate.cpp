@@ -305,6 +305,10 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<std::string> inputFilename(
       llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
 
+  // The IRDL file containing the dialects that we want to generate
+  static llvm::cl::opt<std::string> outputFolder(
+      "o", llvm::cl::desc("Output folder"), llvm::cl::init("-"));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -341,13 +345,11 @@ int main(int argc, char **argv) {
 
   auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {
-    if (programCounter != 0 && programCounter % 1000 == 0) {
-      // Print the percentage of programs that are verifying
-      llvm::errs() << "Generated " << programCounter << " programs, "
-                   << (((float)correctProgramCounter / (float)programCounter) *
-                       100.0f)
-                   << "% verifying \n\n\n";
-    }
+    // Print the percentage of programs that are verifying
+    llvm::errs() << "Generated " << programCounter << " programs, "
+                 << (((float)correctProgramCounter / (float)programCounter) *
+                     100.0f)
+                 << "% verifying \n\n\n";
 
     auto module =
         createProgram(ctx, availableOps, irdlContext, chooser.get(), 2);
