@@ -10,9 +10,9 @@
 
 #include "guide.h"
 
-#include "Dyn/Dialect/IRDL/IR/IRDL.h"
-#include "Dyn/Dialect/IRDL/IR/IRDLAttributes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/IRDL/IR/IRDL.h"
+#include "mlir/Dialect/IRDL/IR/IRDLAttributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Verifier.h"
@@ -148,7 +148,7 @@ void addOperation(GeneratorInfo &info) {
   auto operandDefs = op.getOp<OperandsOp>();
   SmallVector<Value> operands = {};
   if (operandDefs) {
-    for (auto operandAttr : operandDefs->params()) {
+    for (auto operandAttr : operandDefs->getParams()) {
       auto operandConstr = operandAttr.cast<NamedTypeConstraintAttr>();
       auto satisfyingTypes =
           getSatisfyingTypes(info.irdlContext, operandConstr);
@@ -160,7 +160,7 @@ void addOperation(GeneratorInfo &info) {
   auto resultDefs = op.getOp<ResultsOp>();
   SmallVector<Type> resultTypes = {};
   if (resultDefs) {
-    for (auto resultAttr : resultDefs->params()) {
+    for (auto resultAttr : resultDefs->getParams()) {
       auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
       auto satisfyingTypes = getSatisfyingTypes(info.irdlContext, resultConstr);
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
@@ -169,7 +169,7 @@ void addOperation(GeneratorInfo &info) {
   }
 
   // Create the operation.
-  auto *operation = builder.create(UnknownLoc::get(ctx), op.nameAttr(),
+  auto *operation = builder.create(UnknownLoc::get(ctx), op.getNameAttr(),
                                    operands, resultTypes);
   for (auto result : operation->getResults()) {
     info.addDominatingValue(result);
@@ -245,7 +245,7 @@ bool canSatisfyOpConstrs(IRDLContext &irdlCtx, OperationOp op) {
   // Check if we can satisfy all the operand constraints.
   auto operandDefs = op.getOp<OperandsOp>();
   if (operandDefs) {
-    for (auto operandAttr : operandDefs->params()) {
+    for (auto operandAttr : operandDefs->getParams()) {
       auto operandConstr = operandAttr.cast<NamedTypeConstraintAttr>();
       if (getSatisfyingTypes(irdlCtx, operandConstr).empty()) {
         return false;
@@ -256,7 +256,7 @@ bool canSatisfyOpConstrs(IRDLContext &irdlCtx, OperationOp op) {
   // Check if we can satisfy all the result constraints.
   auto resultDefs = op.getOp<ResultsOp>();
   if (resultDefs) {
-    for (auto resultAttr : resultDefs->params()) {
+    for (auto resultAttr : resultDefs->getParams()) {
       auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
       if (getSatisfyingTypes(irdlCtx, resultConstr).empty()) {
         return false;
@@ -266,7 +266,7 @@ bool canSatisfyOpConstrs(IRDLContext &irdlCtx, OperationOp op) {
 
   return true;
 }
-class IntegerTypeWrapper : public ConcreteTypeWrapper<IntegerType> {
+class IntegerTypeWrapper : public CppTypeWrapper<IntegerType> {
   StringRef getName() override { return "builtin.integer_type"; }
 
   /// Instanciates the type from parameters.
