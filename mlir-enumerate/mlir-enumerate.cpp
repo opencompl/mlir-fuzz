@@ -23,6 +23,7 @@
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
 
 using namespace mlir;
 using namespace irdl;
@@ -368,8 +369,25 @@ int main(int argc, char **argv) {
     }
     correctProgramCounter += 1;
 
-    // For now, we are just printing the generated program.
-    // module->dump();
-    // llvm::errs() << "\n";
+    if (outputFolder == "-") {
+      module->dump();
+      continue;
+    }
+
+    // Store the program in the output folder.
+    std::string outputFilename = outputFolder + "/generated-program" +
+                                 std::to_string(correctProgramCounter) +
+                                 ".mlir";
+    llvm::errs() << "Storing program in " << outputFilename << "\n";
+    std::string errorMessage;
+    auto outputFile = openOutputFile(outputFilename, &errorMessage);
+    if (!outputFile) {
+      llvm::errs() << "Error opening output file: " << errorMessage << "\n";
+      return 1;
+    }
+    llvm::errs() << errorMessage << "\n";
+
+    module->print(outputFile->os());
+    outputFile->keep();
   }
 }
