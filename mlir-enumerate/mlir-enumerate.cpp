@@ -95,24 +95,22 @@ Value getValue(GeneratorInfo &info, Type type) {
 /// Get the types that the fuzzer supports.
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getIntegerType(1), builder.getIntegerType(32),
+  return {builder.getIntegerType(1),  builder.getIntegerType(32),
           builder.getIntegerType(64), builder.getIntegerType(17),
-          builder.getIntegerType(3)};
+          builder.getIntegerType(3),  builder.getIndexType(),
+          builder.getF32Type(),       builder.getF64Type()};
 }
 
 /// Get the types that the constraint can support.
-std::vector<Type>
-getSatisfyingTypes(IRDLContext &irdlCtx,
-                   TypeConstraintAttrInterface constraintAttr) {
-  auto *ctx = constraintAttr.getContext();
-  Builder builder(ctx);
-
-  std::vector<Type> availableType = getAvailableTypes(*ctx);
-  auto constr = constraintAttr.getTypeConstraint(irdlCtx, {});
+std::vector<Type> getSatisfyingTypes(
+    MLIRContext &ctx, irdl::TypeConstraint *constraint,
+    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
+    MutableArrayRef<Type> vars) {
+  std::vector<Type> availableType = getAvailableTypes(ctx);
 
   std::vector<Type> satisfyingTypes;
   for (auto type : availableType) {
-    if (constr->verifyType({}, type, {}, {}).succeeded()) {
+    if (constraint->verifyType({}, type, varConstraints, vars).succeeded()) {
       satisfyingTypes.push_back(type);
     }
   }
@@ -120,31 +118,94 @@ getSatisfyingTypes(IRDLContext &irdlCtx,
 }
 
 /// Get the types that the constraint can support.
-std::vector<Type> getSatisfyingTypes(IRDLContext &irdlCtx,
-                                     NamedTypeConstraintAttr constraint) {
-  return getSatisfyingTypes(
-      irdlCtx, constraint.getConstraint().cast<TypeConstraintAttrInterface>());
+std::vector<Type> getSatisfyingTypes(
+    IRDLContext &irdlCtx, TypeConstraintAttrInterface constraintAttr,
+    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
+    MutableArrayRef<Type> vars,
+    const SmallVector<
+        std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
+        &namedVars) {
+  auto *ctx = constraintAttr.getContext();
+  Builder builder(ctx);
+
+  auto constr = constraintAttr.getTypeConstraint(irdlCtx, namedVars);
+  return getSatisfyingTypes(*ctx, constr.get(), varConstraints, vars);
 }
 
 /// Get the types that the constraint can support.
-std::vector<Type> getSatisfyingTypes(IRDLContext &irdlCtx,
-                                     Attribute constraint) {
+std::vector<Type> getSatisfyingTypes(
+    IRDLContext &irdlCtx, NamedTypeConstraintAttr constraint,
+    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
+    MutableArrayRef<Type> vars,
+    const SmallVector<
+        std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
+        &namedVars) {
+  return getSatisfyingTypes(
+      irdlCtx, constraint.getConstraint().cast<TypeConstraintAttrInterface>(),
+      varConstraints, vars, namedVars);
+}
+
+/// Get the types that the constraint can support.
+std::vector<Type> getSatisfyingTypes(
+    IRDLContext &irdlCtx, Attribute constraint,
+    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
+    MutableArrayRef<Type> vars,
+    const SmallVector<
+        std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
+        &namedVars) {
   if (auto constr = constraint.dyn_cast<NamedTypeConstraintAttr>()) {
-    return getSatisfyingTypes(irdlCtx, constr);
+    return getSatisfyingTypes(irdlCtx, constr, varConstraints, vars, namedVars);
   } else if (auto constr = constraint.dyn_cast<TypeConstraintAttrInterface>()) {
-    return getSatisfyingTypes(irdlCtx, constr);
+    return getSatisfyingTypes(irdlCtx, constr, varConstraints, vars, namedVars);
   }
   assert(false && "Unknown attribute given to getSatisfyingTypes");
 }
 
 /// Add a random operation at the insertion point.
-void addOperation(GeneratorInfo &info) {
+/// Return failure if no operations were added.
+LogicalResult addOperation(GeneratorInfo &info) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
 
+  // Chose one operation between all available operations.
   auto availableOps = info.availableOps;
-
   auto op = availableOps[info.chooser->choose(availableOps.size())];
+
+  // The constraint variables, and their assignment.
+  SmallVector<std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
+      namedConstraintVars = {};
+  SmallVector<std::unique_ptr<irdl::TypeConstraint>> varConstraints;
+  SmallVector<Type> vars;
+
+  // For each constraint variable, we assign a type.
+  auto constraintOp = op.getOp<ConstraintVarsOp>();
+  if (constraintOp) {
+    for (auto namedConstraintAttr : constraintOp->getParams()) {
+      auto namedConstraint =
+          namedConstraintAttr.cast<NamedTypeConstraintAttr>();
+      auto constraint =
+          namedConstraint.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+      // TODO(fehr) Currently a hack, will be fixed later once I update
+      // the IRDL API.
+      auto constraint2 =
+          namedConstraint.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+
+      auto satisfyingTypes =
+          getSatisfyingTypes(*ctx, constraint.get(), varConstraints, vars);
+      if (satisfyingTypes.size() == 0)
+        return failure();
+      auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
+
+      namedConstraintVars.emplace_back(namedConstraint.getName(),
+                                       std::move(constraint));
+      varConstraints.emplace_back(std::move(constraint2));
+      vars.push_back(type);
+    }
+  }
 
   auto operandDefs = op.getOp<OperandsOp>();
   SmallVector<Value> operands = {};
@@ -152,7 +213,10 @@ void addOperation(GeneratorInfo &info) {
     for (auto operandAttr : operandDefs->getParams()) {
       auto operandConstr = operandAttr.cast<NamedTypeConstraintAttr>();
       auto satisfyingTypes =
-          getSatisfyingTypes(info.irdlContext, operandConstr);
+          getSatisfyingTypes(info.irdlContext, operandConstr, varConstraints,
+                             vars, namedConstraintVars);
+      if (satisfyingTypes.size() == 0)
+        return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
       operands.push_back(getValue(info, type));
     }
@@ -163,7 +227,11 @@ void addOperation(GeneratorInfo &info) {
   if (resultDefs) {
     for (auto resultAttr : resultDefs->getParams()) {
       auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
-      auto satisfyingTypes = getSatisfyingTypes(info.irdlContext, resultConstr);
+      auto satisfyingTypes =
+          getSatisfyingTypes(info.irdlContext, resultConstr, varConstraints,
+                             vars, namedConstraintVars);
+      if (satisfyingTypes.size() == 0)
+        return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
       resultTypes.push_back(type);
     }
@@ -175,6 +243,8 @@ void addOperation(GeneratorInfo &info) {
   for (auto result : operation->getResults()) {
     info.addDominatingValue(result);
   }
+
+  return success();
 }
 
 /// Create a random program, given the decisions taken from chooser.
@@ -205,7 +275,8 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   // Select how many operations we want to generate, and generate them.
   auto numOps = chooser->choose(fuel + 1);
   for (long i = 0; i < numOps; i++) {
-    addOperation(info);
+    if (addOperation(info).failed())
+      return nullptr;
   }
 
   builder.create<func::ReturnOp>(unknownLoc);
@@ -239,34 +310,6 @@ parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
   return module;
 }
 
-/// Check that we know types that can satisfy the operation constraints.
-/// In an ideal implementation, we should be able to satisfy all of these
-/// operation constraints.
-bool canSatisfyOpConstrs(IRDLContext &irdlCtx, OperationOp op) {
-  // Check if we can satisfy all the operand constraints.
-  auto operandDefs = op.getOp<OperandsOp>();
-  if (operandDefs) {
-    for (auto operandAttr : operandDefs->getParams()) {
-      auto operandConstr = operandAttr.cast<NamedTypeConstraintAttr>();
-      if (getSatisfyingTypes(irdlCtx, operandConstr).empty()) {
-        return false;
-      }
-    }
-  }
-
-  // Check if we can satisfy all the result constraints.
-  auto resultDefs = op.getOp<ResultsOp>();
-  if (resultDefs) {
-    for (auto resultAttr : resultDefs->getParams()) {
-      auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
-      if (getSatisfyingTypes(irdlCtx, resultConstr).empty()) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
 class IntegerTypeWrapper : public CppTypeWrapper<IntegerType> {
   StringRef getName() override { return "builtin.integer_type"; }
 
@@ -337,8 +380,7 @@ int main(int argc, char **argv) {
   // Get the list of operations we support.
   std::vector<OperationOp> availableOps = {};
   dialects->walk([&availableOps, &irdlContext](OperationOp op) {
-    if (canSatisfyOpConstrs(irdlContext, op))
-      availableOps.push_back(op);
+    availableOps.push_back(op);
   });
 
   size_t programCounter = 0;
@@ -348,6 +390,8 @@ int main(int argc, char **argv) {
   while (auto chooser = guide.makeChooser()) {
     auto module =
         createProgram(ctx, availableOps, irdlContext, chooser.get(), 2);
+    if (!module)
+      continue;
     programCounter += 1;
     // Some programs still won't verify, because IRDL is not expressive enough
     // to represent all constraints.
