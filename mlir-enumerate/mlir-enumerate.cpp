@@ -247,6 +247,73 @@ LogicalResult addOperation(GeneratorInfo &info) {
   return success();
 }
 
+/// Check if the given OperationOp can use specified type as a valid return
+/// type.
+bool isValidReturnType(GeneratorInfo &info, irdl::OperationOp op,
+                       mlir::Type type) {
+  auto builder = info.builder;
+  auto ctx = builder.getContext();
+
+  auto constraintOp = op.getOp<irdl::ConstraintVarsOp>();
+  auto resultDefs = op.getOp<ResultsOp>();
+
+  SmallVector<std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
+      namedConstraintVars = {};
+  SmallVector<std::unique_ptr<irdl::TypeConstraint>> varConstraints;
+  SmallVector<Type> vars;
+
+  // For each constraint variable, we try to assign the constraint with the
+  // provided type. Otherwise use one random from all satisfied types.
+  if (constraintOp) {
+    for (auto namedConstraintAttr : constraintOp->getParams()) {
+      auto namedConstraint =
+          namedConstraintAttr.cast<NamedTypeConstraintAttr>();
+      auto constraint =
+          namedConstraint.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+      // TODO(fehr) Currently a hack, will be fixed later once I update
+      // the IRDL API.
+      auto constraint2 =
+          namedConstraint.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+
+      if (constraint.get()
+              ->verifyType({}, type, varConstraints, vars)
+              .succeeded()) {
+        vars.push_back(type);
+      } else {
+        auto satisfyingTypes =
+            getSatisfyingTypes(*ctx, constraint.get(), varConstraints, vars);
+        assert(satisfyingTypes.size() != 0 &&
+               "system can't find a type satisfying constraint");
+        vars.push_back(
+            satisfyingTypes[info.chooser->choose(satisfyingTypes.size())]);
+      }
+      namedConstraintVars.emplace_back(namedConstraint.getName(),
+                                       std::move(constraint));
+      varConstraints.emplace_back(std::move(constraint2));
+    }
+  }
+
+  if (resultDefs) {
+    for (auto resultAttr : resultDefs->getParams()) {
+      auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
+      auto constraint =
+          resultConstr.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+      if (constraint.get()
+              ->verifyType({}, type, varConstraints, vars)
+              .succeeded()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
