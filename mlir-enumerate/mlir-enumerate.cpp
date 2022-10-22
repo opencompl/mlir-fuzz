@@ -251,8 +251,6 @@ LogicalResult addOperation(GeneratorInfo &info) {
 /// type.
 bool isValidReturnType(GeneratorInfo &info, irdl::OperationOp op,
                        mlir::Type type) {
-  auto builder = info.builder;
-  auto ctx = builder.getContext();
 
   auto constraintOp = op.getOp<irdl::ConstraintVarsOp>();
   auto resultDefs = op.getOp<ResultsOp>();
@@ -262,8 +260,7 @@ bool isValidReturnType(GeneratorInfo &info, irdl::OperationOp op,
   SmallVector<std::unique_ptr<irdl::TypeConstraint>> varConstraints;
   SmallVector<Type> vars;
 
-  // For each constraint variable, we try to assign the constraint with the
-  // provided type. Otherwise use one random from all satisfied types.
+  // Named var constraints can be any type.
   if (constraintOp) {
     for (auto namedConstraintAttr : constraintOp->getParams()) {
       auto namedConstraint =
@@ -279,18 +276,7 @@ bool isValidReturnType(GeneratorInfo &info, irdl::OperationOp op,
               .cast<TypeConstraintAttrInterface>()
               .getTypeConstraint(info.irdlContext, namedConstraintVars);
 
-      if (constraint.get()
-              ->verifyType({}, type, varConstraints, vars)
-              .succeeded()) {
-        vars.push_back(type);
-      } else {
-        auto satisfyingTypes =
-            getSatisfyingTypes(*ctx, constraint.get(), varConstraints, vars);
-        assert(satisfyingTypes.size() != 0 &&
-               "system can't find a type satisfying constraint");
-        vars.push_back(
-            satisfyingTypes[info.chooser->choose(satisfyingTypes.size())]);
-      }
+      vars.push_back(Type());
       namedConstraintVars.emplace_back(namedConstraint.getName(),
                                        std::move(constraint));
       varConstraints.emplace_back(std::move(constraint2));
