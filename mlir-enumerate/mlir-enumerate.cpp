@@ -247,6 +247,59 @@ LogicalResult addOperation(GeneratorInfo &info) {
   return success();
 }
 
+/// Check if the given OperationOp can use specified type as a valid return
+/// type.
+bool isValidReturnType(GeneratorInfo &info, irdl::OperationOp op,
+                       mlir::Type type) {
+
+  auto constraintOp = op.getOp<irdl::ConstraintVarsOp>();
+  auto resultDefs = op.getOp<ResultsOp>();
+
+  SmallVector<std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
+      namedConstraintVars = {};
+  SmallVector<std::unique_ptr<irdl::TypeConstraint>> varConstraints;
+  SmallVector<Type> vars;
+
+  // Named var constraints can be any type.
+  if (constraintOp) {
+    for (auto namedConstraintAttr : constraintOp->getParams()) {
+      auto namedConstraint =
+          namedConstraintAttr.cast<NamedTypeConstraintAttr>();
+      auto constraint =
+          namedConstraint.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+      // TODO(fehr) Currently a hack, will be fixed later once I update
+      // the IRDL API.
+      auto constraint2 =
+          namedConstraint.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+
+      vars.push_back(Type());
+      namedConstraintVars.emplace_back(namedConstraint.getName(),
+                                       std::move(constraint));
+      varConstraints.emplace_back(std::move(constraint2));
+    }
+  }
+
+  if (resultDefs) {
+    for (auto resultAttr : resultDefs->getParams()) {
+      auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
+      auto constraint =
+          resultConstr.getConstraint()
+              .cast<TypeConstraintAttrInterface>()
+              .getTypeConstraint(info.irdlContext, namedConstraintVars);
+      if (constraint.get()
+              ->verifyType({}, type, varConstraints, vars)
+              .succeeded()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
