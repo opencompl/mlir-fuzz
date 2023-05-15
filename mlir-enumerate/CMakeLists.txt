@@ -4,7 +4,6 @@ set(LIBS
         ${dialect_libs}
         ${conversion_libs}
         MLIROptLib
-        MLIRIRDL
         )
 add_llvm_executable(mlir-enumerate mlir-enumerate.cpp)
 

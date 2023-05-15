@@ -12,7 +12,8 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
-#include "mlir/Dialect/IRDL/IR/IRDLAttributes.h"
+#include "mlir/Dialect/IRDL/IRDLContext.h"
+#include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Verifier.h"
@@ -20,7 +21,6 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -101,64 +101,20 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
           builder.getF32Type(),       builder.getF64Type()};
 }
 
-/// Get the types that the constraint can support.
-std::vector<Type> getSatisfyingTypes(
-    MLIRContext &ctx, irdl::TypeConstraint *constraint,
-    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
-    MutableArrayRef<Type> vars) {
+/// Get the types that the constraint can support, given a constraint context.
+std::vector<Type> getSatisfyingTypes(MLIRContext &ctx,
+                                     irdl::Constraint *constraint,
+                                     irdl::ConstraintVerifier &context) {
   std::vector<Type> availableType = getAvailableTypes(ctx);
 
   std::vector<Type> satisfyingTypes;
   for (auto type : availableType) {
-    if (constraint->verifyType({}, type, varConstraints, vars).succeeded()) {
+    irdl::ConstraintVerifier context_copy = context;
+    if (constraint->verify({}, TypeAttr::get(type), context_copy).succeeded()) {
       satisfyingTypes.push_back(type);
     }
   }
   return satisfyingTypes;
-}
-
-/// Get the types that the constraint can support.
-std::vector<Type> getSatisfyingTypes(
-    IRDLContext &irdlCtx, TypeConstraintAttrInterface constraintAttr,
-    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
-    MutableArrayRef<Type> vars,
-    const SmallVector<
-        std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
-        &namedVars) {
-  auto *ctx = constraintAttr.getContext();
-  Builder builder(ctx);
-
-  auto constr = constraintAttr.getTypeConstraint(irdlCtx, namedVars);
-  return getSatisfyingTypes(*ctx, constr.get(), varConstraints, vars);
-}
-
-/// Get the types that the constraint can support.
-std::vector<Type> getSatisfyingTypes(
-    IRDLContext &irdlCtx, NamedTypeConstraintAttr constraint,
-    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
-    MutableArrayRef<Type> vars,
-    const SmallVector<
-        std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
-        &namedVars) {
-  return getSatisfyingTypes(
-      irdlCtx, constraint.getConstraint().cast<TypeConstraintAttrInterface>(),
-      varConstraints, vars, namedVars);
-}
-
-/// Get the types that the constraint can support.
-std::vector<Type> getSatisfyingTypes(
-    IRDLContext &irdlCtx, Attribute constraint,
-    ArrayRef<std::unique_ptr<irdl::TypeConstraint>> varConstraints,
-    MutableArrayRef<Type> vars,
-    const SmallVector<
-        std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
-        &namedVars) {
-  if (auto constr = constraint.dyn_cast<NamedTypeConstraintAttr>()) {
-    return getSatisfyingTypes(irdlCtx, constr, varConstraints, vars, namedVars);
-  } else if (auto constr = constraint.dyn_cast<TypeConstraintAttrInterface>()) {
-    return getSatisfyingTypes(irdlCtx, constr, varConstraints, vars, namedVars);
-  }
-  assert(false && "Unknown attribute given to getSatisfyingTypes");
 }
 
 /// Add a random operation at the insertion point.
@@ -167,72 +123,108 @@ LogicalResult addOperation(GeneratorInfo &info) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
 
+  DenseMap<TypeOp, std::unique_ptr<DynamicTypeDefinition>> types;
+  DenseMap<AttributeOp, std::unique_ptr<DynamicAttrDefinition>> attrs;
+
   // Chose one operation between all available operations.
   auto availableOps = info.availableOps;
   auto op = availableOps[info.chooser->choose(availableOps.size())];
 
-  // The constraint variables, and their assignment.
-  SmallVector<std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
-      namedConstraintVars = {};
-  SmallVector<std::unique_ptr<irdl::TypeConstraint>> varConstraints;
-  SmallVector<Type> vars;
-
-  // For each constraint variable, we assign a type.
-  auto constraintOp = op.getOp<ConstraintVarsOp>();
-  if (constraintOp) {
-    for (auto namedConstraintAttr : constraintOp->getParams()) {
-      auto namedConstraint =
-          namedConstraintAttr.cast<NamedTypeConstraintAttr>();
-      auto constraint =
-          namedConstraint.getConstraint()
-              .cast<TypeConstraintAttrInterface>()
-              .getTypeConstraint(info.irdlContext, namedConstraintVars);
-      // TODO(fehr) Currently a hack, will be fixed later once I update
-      // the IRDL API.
-      auto constraint2 =
-          namedConstraint.getConstraint()
-              .cast<TypeConstraintAttrInterface>()
-              .getTypeConstraint(info.irdlContext, namedConstraintVars);
-
-      auto satisfyingTypes =
-          getSatisfyingTypes(*ctx, constraint.get(), varConstraints, vars);
-      if (satisfyingTypes.size() == 0)
-        return failure();
-      auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
-
-      namedConstraintVars.emplace_back(namedConstraint.getName(),
-                                       std::move(constraint));
-      varConstraints.emplace_back(std::move(constraint2));
-      vars.push_back(type);
+  // Resolve SSA values to verifier constraint slots
+  SmallVector<Value> constrToValue;
+  DenseMap<Value, int> valueToIdx;
+  for (Operation &op : op->getRegion(0).getOps()) {
+    if (isa<VerifyConstraintInterface>(op)) {
+      assert(op.getNumResults() == 1);
+      valueToIdx[op.getResult(0)] = constrToValue.size();
+      constrToValue.push_back(op.getResult(0));
     }
   }
 
-  auto operandDefs = op.getOp<OperandsOp>();
+  // Build the verifiers for each constraint slot
+  SmallVector<std::unique_ptr<Constraint>> constraints;
+  DenseMap<Value, Constraint *> valueToConstraint;
+  for (Value v : constrToValue) {
+    VerifyConstraintInterface op =
+        cast<VerifyConstraintInterface>(v.getDefiningOp());
+    std::unique_ptr<Constraint> verifier =
+        op.getVerifier(constrToValue, types, attrs);
+    assert(verifier && "Constraint verifier couldn't be generated");
+    valueToConstraint[v] = verifier.get();
+    constraints.push_back(std::move(verifier));
+  }
+
+  // The verifier, that will check that the operands/results satisfy the
+  // invariants.
+  ConstraintVerifier verifier(constraints);
+
+  auto operandsOp = op.getOp<OperandsOp>();
   SmallVector<Value> operands = {};
-  if (operandDefs) {
-    for (auto operandAttr : operandDefs->getParams()) {
-      auto operandConstr = operandAttr.cast<NamedTypeConstraintAttr>();
+  if (operandsOp) {
+    for (Value operand : operandsOp->getArgs()) {
+      auto operandConstraint = valueToConstraint[operand];
       auto satisfyingTypes =
-          getSatisfyingTypes(info.irdlContext, operandConstr, varConstraints,
-                             vars, namedConstraintVars);
+          getSatisfyingTypes(*ctx, operandConstraint, verifier);
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
+
+      // Set the operand variable in the verifier context, so other variables
+      // are recursively set.
+      SmallVector<std::optional<Attribute>> assigned =
+          *((SmallVector<std::optional<Attribute>>
+                 *)(((void *)&verifier) +
+                    sizeof(ArrayRef<std::unique_ptr<Constraint>>)));
+
+      llvm::errs() << "First \n";
+      llvm::errs() << assigned.size() << "\n";
+      for (auto a : assigned) {
+        if (a.has_value()) {
+          llvm::errs() << a.value() << "\n";
+        } else {
+          llvm::errs() << "Nope \n";
+        }
+      }
+      llvm::errs() << "\n\n";
+      auto verified =
+          verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
+      assert(verified.succeeded());
+
+      assigned = *((SmallVector<std::optional<Attribute>>
+                        *)(((void *)&verifier) +
+                           sizeof(ArrayRef<std::unique_ptr<Constraint>>)));
+
+      llvm::errs() << assigned.size() << "\n";
+      for (auto a : assigned) {
+        if (a.has_value()) {
+          llvm::errs() << a.value() << "\n";
+        } else {
+          llvm::errs() << "Nope \n";
+        }
+      }
+      llvm::errs() << "\n\n\n\n";
+
       operands.push_back(getValue(info, type));
     }
   }
 
-  auto resultDefs = op.getOp<ResultsOp>();
+  auto resultsOp = op.getOp<ResultsOp>();
   SmallVector<Type> resultTypes = {};
-  if (resultDefs) {
-    for (auto resultAttr : resultDefs->getParams()) {
-      auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
+  if (resultsOp) {
+    for (Value result : resultsOp->getArgs()) {
+      auto resultConstraint = valueToConstraint[result];
       auto satisfyingTypes =
-          getSatisfyingTypes(info.irdlContext, resultConstr, varConstraints,
-                             vars, namedConstraintVars);
+          getSatisfyingTypes(*ctx, resultConstraint, verifier);
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
+
+      // Set the result variable in the verifier context, so other variables
+      // are recursively set.
+      auto verified =
+          verifier.verify({}, TypeAttr::get(type), valueToIdx[result]);
+      assert(verified.succeeded());
+
       resultTypes.push_back(type);
     }
   }
@@ -245,59 +237,6 @@ LogicalResult addOperation(GeneratorInfo &info) {
   }
 
   return success();
-}
-
-/// Check if the given OperationOp can use specified type as a valid return
-/// type.
-bool isValidReturnType(GeneratorInfo &info, irdl::OperationOp op,
-                       mlir::Type type) {
-
-  auto constraintOp = op.getOp<irdl::ConstraintVarsOp>();
-  auto resultDefs = op.getOp<ResultsOp>();
-
-  SmallVector<std::pair<StringRef, std::unique_ptr<irdl::TypeConstraint>>>
-      namedConstraintVars = {};
-  SmallVector<std::unique_ptr<irdl::TypeConstraint>> varConstraints;
-  SmallVector<Type> vars;
-
-  // Named var constraints can be any type.
-  if (constraintOp) {
-    for (auto namedConstraintAttr : constraintOp->getParams()) {
-      auto namedConstraint =
-          namedConstraintAttr.cast<NamedTypeConstraintAttr>();
-      auto constraint =
-          namedConstraint.getConstraint()
-              .cast<TypeConstraintAttrInterface>()
-              .getTypeConstraint(info.irdlContext, namedConstraintVars);
-      // TODO(fehr) Currently a hack, will be fixed later once I update
-      // the IRDL API.
-      auto constraint2 =
-          namedConstraint.getConstraint()
-              .cast<TypeConstraintAttrInterface>()
-              .getTypeConstraint(info.irdlContext, namedConstraintVars);
-
-      vars.push_back(Type());
-      namedConstraintVars.emplace_back(namedConstraint.getName(),
-                                       std::move(constraint));
-      varConstraints.emplace_back(std::move(constraint2));
-    }
-  }
-
-  if (resultDefs) {
-    for (auto resultAttr : resultDefs->getParams()) {
-      auto resultConstr = resultAttr.cast<NamedTypeConstraintAttr>();
-      auto constraint =
-          resultConstr.getConstraint()
-              .cast<TypeConstraintAttrInterface>()
-              .getTypeConstraint(info.irdlContext, namedConstraintVars);
-      if (constraint.get()
-              ->verifyType({}, type, varConstraints, vars)
-              .succeeded()) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 /// Create a random program, given the decisions taken from chooser.
@@ -344,7 +283,7 @@ parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
   auto file = openInputFile(inputFilename, &errorMessage);
   if (!file) {
     llvm::errs() << errorMessage << "\n";
-    return llvm::None;
+    return std::nullopt;
   }
 
   // Tell sourceMgr about this buffer, which is what the parser will pick
@@ -367,8 +306,8 @@ class IntegerTypeWrapper : public CppTypeWrapper<IntegerType> {
   StringRef getName() override { return "builtin.integer_type"; }
 
   /// Instanciates the type from parameters.
-  Type instantiate(llvm::function_ref<InFlightDiagnostic()> emitError,
-                   llvm::ArrayRef<Attribute> parameters) override {
+  Type instantiateType(llvm::function_ref<InFlightDiagnostic()> emitError,
+                       llvm::ArrayRef<Attribute> parameters) override {
     if (parameters.size() != 1) {
       emitError() << "expected 1 parameter, got " << parameters.size();
       return {};
@@ -388,7 +327,8 @@ class IntegerTypeWrapper : public CppTypeWrapper<IntegerType> {
 
   size_t getParameterAmount() override { return 1; }
 
-  llvm::SmallVector<mlir::Attribute> getParameters(IntegerType type) override {
+  llvm::SmallVector<mlir::Attribute>
+  getTypeParameters(IntegerType type) override {
     auto width = type.getWidth();
     auto *context = type.getContext();
     Builder builder(context);
@@ -418,7 +358,8 @@ int main(int argc, char **argv) {
   auto *irdlDialect = ctx.getOrLoadDialect<irdl::IRDLDialect>();
   ctx.loadAllAvailableDialects();
 
-  irdlDialect->addTypeWrapper(std::make_unique<IntegerTypeWrapper>());
+  irdlDialect->irdlContext.addTypeWrapper(
+      std::make_unique<IntegerTypeWrapper>());
   auto &irdlContext = irdlDialect->irdlContext;
 
   // Try to parse the dialects.
