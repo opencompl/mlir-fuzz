@@ -10,12 +10,10 @@
 
 #include "GeneratorInfo.h"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLContext.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
@@ -27,35 +25,6 @@
 
 using namespace mlir;
 using namespace irdl;
-
-/// Get a value in the program.
-/// This may add a new argument to the function.
-Value getValue(GeneratorInfo &info, Type type) {
-  auto builder = info.builder;
-  auto &domValues = info.dominatingValues[type];
-
-  // For now, we assume that we are only generating values of the same type.
-  auto choice = info.chooser->choose(domValues.size() + 1);
-
-  // If we chose a dominating value, return it
-  if (choice < (long)domValues.size()) {
-    return domValues[choice];
-  }
-
-  // Otherwise, add a new argument to the parent function.
-  auto func = cast<func::FuncOp>(*builder.getInsertionBlock()->getParentOp());
-
-  // We first chose an index where to add this argument.
-  // Note that this is very costly when we are enumerating all programs of
-  // a certain size.
-  auto newArgIndex = info.chooser->choose(func.getNumArguments() + 1);
-
-  func.insertArgument(newArgIndex, type, {},
-                      UnknownLoc::get(builder.getContext()));
-  auto arg = func.getArgument(newArgIndex);
-  info.addDominatingValue(arg);
-  return arg;
-}
 
 /// Get the types that the fuzzer supports.
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
