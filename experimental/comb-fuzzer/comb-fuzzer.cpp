@@ -9,7 +9,6 @@
 #include "guide.h"
 
 #include "GeneratorInfo.h"
-#include "Graph.h"
 
 #include "mlir/InitAllDialects.h"
 #include "llvm/Support/CommandLine.h"
