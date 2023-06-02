@@ -37,6 +37,10 @@ Value addBinary(GeneratorInfo &info) {
   auto rhs = info.dominatingValues[type][info.chooser->choose(
       info.dominatingValues[type].size())];
 
+  if (lhs == rhs && !(op_name == "comb.shl" || op_name == "comb.shru" ||
+                      op_name == "comb.shrs"))
+    return nullptr;
+
   auto ctx = info.builder.getContext();
   auto *operation =
       info.builder.create(UnknownLoc::get(ctx), StringAttr::get(ctx, op_name),
@@ -102,7 +106,9 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   info.addDominatingValue(func.getArgument(2));
 
   for (int i = 0; i < fuel - 1; i++) {
-    addOperation(info);
+    auto value = addOperation(info);
+    if (value == nullptr)
+      return nullptr;
   }
   auto value = addOperation(info);
   for (auto type : info.dominatingValues) {
