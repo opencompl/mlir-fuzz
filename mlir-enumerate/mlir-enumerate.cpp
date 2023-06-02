@@ -102,15 +102,14 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
 }
 
 /// Get the types that the constraint can support, given a constraint context.
-std::vector<Type> getSatisfyingTypes(MLIRContext &ctx,
-                                     irdl::Constraint *constraint,
+std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, int constraint,
                                      irdl::ConstraintVerifier &context) {
   std::vector<Type> availableType = getAvailableTypes(ctx);
 
   std::vector<Type> satisfyingTypes;
   for (auto type : availableType) {
     irdl::ConstraintVerifier context_copy = context;
-    if (constraint->verify({}, TypeAttr::get(type), context_copy).succeeded()) {
+    if (context_copy.verify({}, TypeAttr::get(type), constraint).succeeded()) {
       satisfyingTypes.push_back(type);
     }
   }
@@ -164,45 +163,16 @@ LogicalResult addOperation(GeneratorInfo &info) {
     for (Value operand : operandsOp->getArgs()) {
       auto operandConstraint = valueToConstraint[operand];
       auto satisfyingTypes =
-          getSatisfyingTypes(*ctx, operandConstraint, verifier);
+          getSatisfyingTypes(*ctx, valueToIdx[operand], verifier);
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
 
       // Set the operand variable in the verifier context, so other variables
       // are recursively set.
-      SmallVector<std::optional<Attribute>> assigned =
-          *((SmallVector<std::optional<Attribute>>
-                 *)(((void *)&verifier) +
-                    sizeof(ArrayRef<std::unique_ptr<Constraint>>)));
-
-      llvm::errs() << "First \n";
-      llvm::errs() << assigned.size() << "\n";
-      for (auto a : assigned) {
-        if (a.has_value()) {
-          llvm::errs() << a.value() << "\n";
-        } else {
-          llvm::errs() << "Nope \n";
-        }
-      }
-      llvm::errs() << "\n\n";
       auto verified =
           verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
       assert(verified.succeeded());
-
-      assigned = *((SmallVector<std::optional<Attribute>>
-                        *)(((void *)&verifier) +
-                           sizeof(ArrayRef<std::unique_ptr<Constraint>>)));
-
-      llvm::errs() << assigned.size() << "\n";
-      for (auto a : assigned) {
-        if (a.has_value()) {
-          llvm::errs() << a.value() << "\n";
-        } else {
-          llvm::errs() << "Nope \n";
-        }
-      }
-      llvm::errs() << "\n\n\n\n";
 
       operands.push_back(getValue(info, type));
     }
@@ -214,7 +184,7 @@ LogicalResult addOperation(GeneratorInfo &info) {
     for (Value result : resultsOp->getArgs()) {
       auto resultConstraint = valueToConstraint[result];
       auto satisfyingTypes =
-          getSatisfyingTypes(*ctx, resultConstraint, verifier);
+          getSatisfyingTypes(*ctx, valueToIdx[result], verifier);
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
