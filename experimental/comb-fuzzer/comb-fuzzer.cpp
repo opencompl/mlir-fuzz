@@ -8,11 +8,22 @@
 
 #include "guide.h"
 
+#include "GeneratorInfo.h"
+#include "Graph.h"
+
 #include "mlir/InitAllDialects.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 
 using namespace mlir;
+
+/// Create a value of the given type.
+/// This may add a new argument to the function.
+Value createValue(GeneratorInfo &info, int fuel, Type type) {
+  if (fuel == 0)
+    return getValue(info, type);
+  assert(false && "Not implemented");
+}
 
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
                                     tree_guide::Chooser *chooser, int fuel) {
@@ -31,6 +42,12 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   func.setPrivate();
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
+
+  GeneratorInfo info(chooser, {}, builder,
+                     ctx.getOrLoadDialect<irdl::IRDLDialect>()->irdlContext);
+  for (int i = 0; i < fuel; i++) {
+    createValue(info, 0, IntegerType::get(&ctx, chooser->choose(7)));
+  }
 
   builder.create<func::ReturnOp>(unknownLoc);
   return module;
@@ -55,8 +72,16 @@ int main(int argc, char **argv) {
 
   auto guide = tree_guide::BFSGuide(42);
 
+  int n = 0;
   while (auto chooser = guide.makeChooser()) {
+    auto module = createProgram(ctx, chooser.get(), 3);
+    module->print(llvm::outs());
+    llvm::errs() << "Printed " << n << "modules"
+                 << "\n";
+    n++;
   }
+
+  llvm::errs() << n << " modules generated\n";
 
   return 0;
 }
