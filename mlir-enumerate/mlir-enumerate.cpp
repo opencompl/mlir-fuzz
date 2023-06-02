@@ -8,7 +8,7 @@
 
 #include <vector>
 
-#include "guide.h"
+#include "GeneratorInfo.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
@@ -27,41 +27,6 @@
 
 using namespace mlir;
 using namespace irdl;
-
-/// Data structure to hold some information about the current program
-/// being generated.
-struct GeneratorInfo {
-  /// The chooser, which will chose which path to take in the decision tree.
-  tree_guide::Chooser *chooser;
-
-  /// All available ops that can be used by the fuzzer.
-  ArrayRef<OperationOp> availableOps;
-
-  /// A builder set to the end of the function.
-  OpBuilder builder;
-
-  /// Context for the runtime registration of IRDL dialect definitions.
-  IRDLContext &irdlContext;
-
-  /// The set of values that are dominating the insertion point.
-  /// We group the values by their type.
-  /// We store values of the same type in a vector to iterate on them
-  /// deterministically.
-  /// Since we are iterating from top to bottom of the program, we do not
-  /// need to remove elements from this set.
-  llvm::DenseMap<Type, std::vector<Value>> dominatingValues;
-
-  GeneratorInfo(tree_guide::Chooser *chooser,
-                ArrayRef<OperationOp> availableOps, OpBuilder builder,
-                IRDLContext &irdlContext)
-      : chooser(chooser), availableOps(availableOps), builder(builder),
-        irdlContext(irdlContext) {}
-
-  /// Add a value to the list of available values.
-  void addDominatingValue(Value value) {
-    dominatingValues[value.getType()].push_back(value);
-  }
-};
 
 /// Get a value in the program.
 /// This may add a new argument to the function.

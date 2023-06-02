@@ -5,6 +5,7 @@ set(LIBS
         ${conversion_libs}
         MLIROptLib
         )
+
 add_llvm_executable(mlir-enumerate mlir-enumerate.cpp)
 
 llvm_update_compile_flags(mlir-enumerate)
