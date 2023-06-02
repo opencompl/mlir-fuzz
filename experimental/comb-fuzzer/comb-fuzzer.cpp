@@ -101,8 +101,17 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
                       mlir::UnknownLoc::get(builder.getContext()));
   info.addDominatingValue(func.getArgument(2));
 
-  for (int i = 0; i < fuel; i++) {
+  for (int i = 0; i < fuel - 1; i++) {
     addOperation(info);
+  }
+  auto value = addOperation(info);
+  for (auto type : info.dominatingValues) {
+    for (auto val : type.second) {
+      if (val == value)
+        continue;
+      if (val.getUses().empty())
+        return nullptr;
+    }
   }
 
   builder.create<func::ReturnOp>(unknownLoc);
@@ -130,12 +139,16 @@ int main(int argc, char **argv) {
   auto guide = tree_guide::BFSGuide(42);
 
   int n = 0;
+  int nPassed = 0;
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgram(ctx, chooser.get(), 3);
-    module->print(llvm::outs());
-    llvm::errs() << "Printed " << n << "modules"
-                 << "\n";
     n++;
+    if (!module)
+      continue;
+    nPassed++;
+    module->print(llvm::outs());
+    llvm::errs() << "Printed " << nPassed << "modules"
+                 << " over " << n << "total\n";
   }
 
   llvm::errs() << n << " modules generated\n";
