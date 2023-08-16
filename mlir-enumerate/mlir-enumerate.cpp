@@ -11,7 +11,6 @@
 #include "GeneratorInfo.h"
 
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
-#include "mlir/Dialect/IRDL/IRDLContext.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Verifier.h"
@@ -95,7 +94,6 @@ LogicalResult addOperation(GeneratorInfo &info) {
   SmallVector<Value> operands = {};
   if (operandsOp) {
     for (Value operand : operandsOp->getArgs()) {
-      auto operandConstraint = valueToConstraint[operand];
       auto satisfyingTypes =
           getSatisfyingTypes(*ctx, valueToIdx[operand], verifier);
       if (satisfyingTypes.size() == 0)
@@ -116,7 +114,6 @@ LogicalResult addOperation(GeneratorInfo &info) {
   SmallVector<Type> resultTypes = {};
   if (resultsOp) {
     for (Value result : resultsOp->getArgs()) {
-      auto resultConstraint = valueToConstraint[result];
       auto satisfyingTypes =
           getSatisfyingTypes(*ctx, valueToIdx[result], verifier);
       if (satisfyingTypes.size() == 0)
@@ -147,7 +144,6 @@ LogicalResult addOperation(GeneratorInfo &info) {
 /// The program has at most `fuel` operations.
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
                                     ArrayRef<OperationOp> availableOps,
-                                    IRDLContext &irdlCtx,
                                     tree_guide::Chooser *chooser, int fuel) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
@@ -166,7 +162,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
   // Create the generator info
-  GeneratorInfo info(chooser, availableOps, builder, irdlCtx);
+  GeneratorInfo info(chooser, availableOps, builder);
 
   // Select how many operations we want to generate, and generate them.
   auto numOps = chooser->choose(fuel + 1);
@@ -180,7 +176,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
 }
 
 /// Parse a file containing the dialects that we want to use.
-llvm::Optional<OwningOpRef<ModuleOp>>
+std::optional<OwningOpRef<ModuleOp>>
 parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
   // Set up the input file.
   std::string errorMessage;
@@ -206,40 +202,6 @@ parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
   return module;
 }
 
-class IntegerTypeWrapper : public CppTypeWrapper<IntegerType> {
-  StringRef getName() override { return "builtin.integer_type"; }
-
-  /// Instanciates the type from parameters.
-  Type instantiateType(llvm::function_ref<InFlightDiagnostic()> emitError,
-                       llvm::ArrayRef<Attribute> parameters) override {
-    if (parameters.size() != 1) {
-      emitError() << "expected 1 parameter, got " << parameters.size();
-      return {};
-    }
-
-    auto widthAttr = parameters[0].dyn_cast<IntegerAttr>();
-    if (!widthAttr) {
-      emitError() << "expected integer attribute parameter, got "
-                  << parameters[0];
-      return {};
-    }
-
-    auto *ctx = widthAttr.getContext();
-    Builder builder(ctx);
-    return builder.getIntegerType(widthAttr.getInt());
-  }
-
-  size_t getParameterAmount() override { return 1; }
-
-  llvm::SmallVector<mlir::Attribute>
-  getTypeParameters(IntegerType type) override {
-    auto width = type.getWidth();
-    auto *context = type.getContext();
-    Builder builder(context);
-    return {builder.getIndexAttr(width)};
-  }
-};
-
 int main(int argc, char **argv) {
 
   // The IRDL file containing the dialects that we want to generate
@@ -259,12 +221,8 @@ int main(int argc, char **argv) {
   DialectRegistry registry;
   registerAllDialects(registry);
   ctx.appendDialectRegistry(registry);
-  auto *irdlDialect = ctx.getOrLoadDialect<irdl::IRDLDialect>();
+  ctx.getOrLoadDialect<irdl::IRDLDialect>();
   ctx.loadAllAvailableDialects();
-
-  irdlDialect->irdlContext.addTypeWrapper(
-      std::make_unique<IntegerTypeWrapper>());
-  auto &irdlContext = irdlDialect->irdlContext;
 
   // Try to parse the dialects.
   auto optDialects = parseIRDLDialects(ctx, inputFilename);
@@ -277,17 +235,15 @@ int main(int argc, char **argv) {
 
   // Get the list of operations we support.
   std::vector<OperationOp> availableOps = {};
-  dialects->walk([&availableOps, &irdlContext](OperationOp op) {
-    availableOps.push_back(op);
-  });
+  dialects->walk(
+      [&availableOps](OperationOp op) { availableOps.push_back(op); });
 
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
   auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {
-    auto module =
-        createProgram(ctx, availableOps, irdlContext, chooser.get(), 2);
+    auto module = createProgram(ctx, availableOps, chooser.get(), 2);
     if (!module)
       continue;
     programCounter += 1;

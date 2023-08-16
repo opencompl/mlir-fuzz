@@ -17,7 +17,6 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
-#include "mlir/Dialect/IRDL/IRDLContext.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 
@@ -33,9 +32,6 @@ struct GeneratorInfo {
   /// A builder set to the end of the function.
   mlir::OpBuilder builder;
 
-  /// Context for the runtime registration of IRDL dialect definitions.
-  mlir::irdl::IRDLContext &irdlContext;
-
   /// The set of values that are dominating the insertion point.
   /// We group the values by their type.
   /// We store values of the same type in a vector to iterate on them
@@ -46,9 +42,8 @@ struct GeneratorInfo {
 
   GeneratorInfo(tree_guide::Chooser *chooser,
                 mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
-                mlir::OpBuilder builder, mlir::irdl::IRDLContext &irdlContext)
-      : chooser(chooser), availableOps(availableOps), builder(builder),
-        irdlContext(irdlContext) {}
+                mlir::OpBuilder builder)
+      : chooser(chooser), availableOps(availableOps), builder(builder) {}
 
   /// Add a value to the list of available values.
   void addDominatingValue(mlir::Value value) {
