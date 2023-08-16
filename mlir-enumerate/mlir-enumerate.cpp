@@ -130,9 +130,13 @@ LogicalResult addOperation(GeneratorInfo &info) {
     }
   }
 
+  StringRef dialectName = op.getParentOp().getName();
+  StringRef opSuffix = op.getNameAttr().getValue();
+  StringAttr opName = StringAttr::get(ctx, dialectName + "." + opSuffix);
+
   // Create the operation.
-  auto *operation = builder.create(UnknownLoc::get(ctx), op.getNameAttr(),
-                                   operands, resultTypes);
+  auto *operation =
+      builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes);
   for (auto result : operation->getResults()) {
     info.addDominatingValue(result);
   }

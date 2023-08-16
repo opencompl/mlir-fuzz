@@ -4,7 +4,7 @@ module {
 // Not implemented because we don't have constraints for integer attribute: arith.constant
 
   irdl.dialect @arith {
-    irdl.operation @arith.addf {
+    irdl.operation @addf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -16,7 +16,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.addi {
+    irdl.operation @addi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -86,7 +86,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.addui_extended {
+    irdl.operation @addui_extended {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -156,7 +156,7 @@ module {
       irdl.results(%T, %i1)
     }
 
-    irdl.operation @arith.andi {
+    irdl.operation @andi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -226,7 +226,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.bitcast {
+    irdl.operation @bitcast {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -303,7 +303,7 @@ module {
       irdl.results(%T2)
     }
  
-    irdl.operation @arith.ceildivsi {
+    irdl.operation @ceildivsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -373,7 +373,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.ceildivui {
+    irdl.operation @ceildivui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -443,7 +443,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.cmpf {
+    irdl.operation @cmpf {
       %i1 = irdl.is i1
 
       %bf16 = irdl.is bf16
@@ -477,7 +477,7 @@ module {
       irdl.attributes { "predicate" = %predT }
     }
 
-    irdl.operation @arith.cmpi {
+    irdl.operation @cmpi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -560,7 +560,7 @@ module {
       irdl.results(%i1)
     }
 
-    irdl.operation @arith.divf {
+    irdl.operation @divf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -572,7 +572,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.divsi {
+    irdl.operation @divsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -642,7 +642,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.divui {
+    irdl.operation @divui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -712,7 +712,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.extf {
+    irdl.operation @extf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -725,7 +725,7 @@ module {
       irdl.results(%T2)
     }
 
-    irdl.operation @arith.extsi {
+    irdl.operation @extsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -796,7 +796,7 @@ module {
       irdl.results(%T2)
     }
 
-    irdl.operation @arith.extui {
+    irdl.operation @extui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -867,7 +867,7 @@ module {
       irdl.results(%T2)
     }
 
-    irdl.operation @arith.floordivsi {
+    irdl.operation @floordivsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -937,7 +937,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.fptosi {
+    irdl.operation @fptosi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1016,7 +1016,7 @@ module {
       irdl.results(%Ti)
     }
 
-    irdl.operation @arith.fptoui {
+    irdl.operation @fptoui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1095,7 +1095,7 @@ module {
       irdl.results(%Ti)
     }
 
-    irdl.operation @arith.maxf {
+    irdl.operation @maxf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -1107,7 +1107,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.maxsi {
+    irdl.operation @maxsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1177,7 +1177,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.maxui {
+    irdl.operation @maxui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1247,7 +1247,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.minf {
+    irdl.operation @minf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -1259,7 +1259,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.minsi {
+    irdl.operation @minsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1329,7 +1329,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.minui {
+    irdl.operation @minui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1399,7 +1399,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.mulf {
+    irdl.operation @mulf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -1411,7 +1411,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.muli {
+    irdl.operation @muli {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1481,7 +1481,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.mului_extended {
+    irdl.operation @mului_extended {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1551,7 +1551,7 @@ module {
       irdl.results(%T, %T)
     }
 
-    irdl.operation @arith.negf {
+    irdl.operation @negf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -1563,7 +1563,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.ori {
+    irdl.operation @ori {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1633,7 +1633,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.remf {
+    irdl.operation @remf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -1645,7 +1645,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.remsi {
+    irdl.operation @remsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1715,7 +1715,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.remui {
+    irdl.operation @remui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1785,14 +1785,14 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.select {
+    irdl.operation @select {
       %i1 = irdl.is i1
       %T = irdl.any
       irdl.operands(%i1, %T, %T)
       irdl.results(%T)
     }
 
-    irdl.operation @arith.shli {
+    irdl.operation @shli {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1862,7 +1862,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.shrsi {
+    irdl.operation @shrsi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -1932,7 +1932,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.shrui {
+    irdl.operation @shrui {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -2002,7 +2002,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.sitofp {
+    irdl.operation @sitofp {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -2081,7 +2081,7 @@ module {
       irdl.results(%Tf)
     }
 
-    irdl.operation @arith.subf {
+    irdl.operation @subf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -2094,7 +2094,7 @@ module {
     }
 
 
-    irdl.operation @arith.subi {
+    irdl.operation @subi {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -2164,7 +2164,7 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @arith.truncf {
+    irdl.operation @truncf {
       %bf16 = irdl.is bf16
       %f16 = irdl.is f16
       %f32 = irdl.is f32
@@ -2178,7 +2178,7 @@ module {
     }
 
 
-    irdl.operation @arith.trunci {
+    irdl.operation @trunci {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -2249,7 +2249,7 @@ module {
       irdl.results(%T2)
     }
 
-    irdl.operation @arith.uitofp {
+    irdl.operation @uitofp {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
@@ -2328,7 +2328,7 @@ module {
       irdl.results(%Tf)
     }
 
-    irdl.operation @arith.xori {
+    irdl.operation @xori {
       %i1 = irdl.is i1
       %i2 = irdl.is i2
       %i3 = irdl.is i3
