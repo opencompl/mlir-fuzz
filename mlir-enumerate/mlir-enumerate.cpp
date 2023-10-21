@@ -175,7 +175,16 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
       return nullptr;
   }
 
-  builder.create<func::ReturnOp>(unknownLoc);
+  std::vector<Value> values;
+  for (auto v : info.dominatingValues)
+    values.insert(values.end(), v.second.begin(), v.second.end());
+
+  if (values.empty())
+    return module;
+
+  auto value = values[chooser->choose(values.size())];
+  builder.create<func::ReturnOp>(unknownLoc, value);
+  func.insertResult(0, value.getType(), {});
   return module;
 }
 
