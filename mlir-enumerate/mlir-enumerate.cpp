@@ -65,7 +65,7 @@ LogicalResult addOperation(GeneratorInfo &info) {
           verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
       assert(verified.succeeded());
 
-      operands.push_back(getValue(info, type));
+      operands.push_back(info.getValue(type, true));
     }
   }
 

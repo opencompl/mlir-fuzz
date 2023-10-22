@@ -49,36 +49,35 @@ struct GeneratorInfo {
   void addDominatingValue(mlir::Value value) {
     dominatingValues[value.getType()].push_back(value);
   }
-};
 
-/// Get a value in the program.
-/// This may add a new argument to the function.
-inline mlir::Value getValue(GeneratorInfo &info, mlir::Type type) {
-  auto builder = info.builder;
-  auto &domValues = info.dominatingValues[type];
+  /// Get a value in the program.
+  /// This may add a new argument to the function.
+  mlir::Value getValue(mlir::Type type, bool addAsArgument) {
+    auto &domValues = dominatingValues[type];
 
-  // For now, we assume that we are only generating values of the same type.
-  auto choice = info.chooser->choose(domValues.size() + 1);
+    // For now, we assume that we are only generating values of the same type.
+    auto choice = chooser->choose(domValues.size() + addAsArgument);
 
-  // If we chose a dominating value, return it
-  if (choice < (long)domValues.size()) {
-    return domValues[choice];
+    // If we chose a dominating value, return it
+    if (choice < (long)domValues.size()) {
+      return domValues[choice];
+    }
+
+    // Otherwise, add a new argument to the parent function.
+    auto func = llvm::cast<mlir::func::FuncOp>(
+        *builder.getInsertionBlock()->getParentOp());
+
+    // We first chose an index where to add this argument.
+    // Note that this is very costly when we are enumerating all programs of
+    // a certain size.
+    auto newArgIndex = chooser->choose(func.getNumArguments() + 1);
+
+    func.insertArgument(newArgIndex, type, {},
+                        mlir::UnknownLoc::get(builder.getContext()));
+    auto arg = func.getArgument(newArgIndex);
+    addDominatingValue(arg);
+    return arg;
   }
-
-  // Otherwise, add a new argument to the parent function.
-  auto func = llvm::cast<mlir::func::FuncOp>(
-      *builder.getInsertionBlock()->getParentOp());
-
-  // We first chose an index where to add this argument.
-  // Note that this is very costly when we are enumerating all programs of
-  // a certain size.
-  auto newArgIndex = info.chooser->choose(func.getNumArguments() + 1);
-
-  func.insertArgument(newArgIndex, type, {},
-                      mlir::UnknownLoc::get(builder.getContext()));
-  auto arg = func.getArgument(newArgIndex);
-  info.addDominatingValue(arg);
-  return arg;
-}
+};
 
 #endif // MLIR_FUZZ_GENERATOR_INFO_H
