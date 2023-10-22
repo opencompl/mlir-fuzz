@@ -37,7 +37,8 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
 
 /// Add a random operation at the insertion point.
 /// Return failure if no operations were added.
-LogicalResult addOperation(GeneratorInfo &info) {
+LogicalResult addOperation(GeneratorInfo &info, bool addFunctionArgs,
+                           ArrayRef<Type> availableTypes) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
 
@@ -53,8 +54,8 @@ LogicalResult addOperation(GeneratorInfo &info) {
   SmallVector<Value> operands = {};
   if (operandsOp) {
     for (Value operand : operandsOp->getArgs()) {
-      auto satisfyingTypes = getSatisfyingTypes(
-          *ctx, valueToIdx[operand], verifier, getAvailableTypes(*ctx));
+      auto satisfyingTypes = getSatisfyingTypes(*ctx, valueToIdx[operand],
+                                                verifier, availableTypes);
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
@@ -73,8 +74,8 @@ LogicalResult addOperation(GeneratorInfo &info) {
   SmallVector<Type> resultTypes = {};
   if (resultsOp) {
     for (Value result : resultsOp->getArgs()) {
-      auto satisfyingTypes = getSatisfyingTypes(
-          *ctx, valueToIdx[result], verifier, getAvailableTypes(*ctx));
+      auto satisfyingTypes = getSatisfyingTypes(*ctx, valueToIdx[result],
+                                                verifier, availableTypes);
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
@@ -130,7 +131,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   // Select how many operations we want to generate, and generate them.
   auto numOps = chooser->choose(fuel + 1);
   for (long i = 0; i < numOps; i++) {
-    if (addOperation(info).failed())
+    if (addOperation(info, true, getAvailableTypes(ctx)).failed())
       return nullptr;
   }
 
