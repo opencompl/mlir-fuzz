@@ -203,7 +203,6 @@ int main(int argc, char **argv) {
 
   // Get the dialects.
   auto &dialects = optDialects.value();
-  dialects->dump();
 
   // Get the list of operations we support.
   std::vector<OperationOp> availableOps = {};
