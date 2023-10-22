@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "GeneratorInfo.h"
+#include "IRDLUtils.h"
 
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
@@ -34,68 +35,26 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
           builder.getF32Type(),       builder.getF64Type()};
 }
 
-/// Get the types that the constraint can support, given a constraint context.
-std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, int constraint,
-                                     irdl::ConstraintVerifier &context) {
-  std::vector<Type> availableType = getAvailableTypes(ctx);
-
-  std::vector<Type> satisfyingTypes;
-  for (auto type : availableType) {
-    irdl::ConstraintVerifier context_copy = context;
-    if (context_copy.verify({}, TypeAttr::get(type), constraint).succeeded()) {
-      satisfyingTypes.push_back(type);
-    }
-  }
-  return satisfyingTypes;
-}
-
 /// Add a random operation at the insertion point.
 /// Return failure if no operations were added.
 LogicalResult addOperation(GeneratorInfo &info) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
 
-  DenseMap<TypeOp, std::unique_ptr<DynamicTypeDefinition>> types;
-  DenseMap<AttributeOp, std::unique_ptr<DynamicAttrDefinition>> attrs;
-
   // Chose one operation between all available operations.
   auto availableOps = info.availableOps;
   auto op = availableOps[info.chooser->choose(availableOps.size())];
 
-  // Resolve SSA values to verifier constraint slots
-  SmallVector<Value> constrToValue;
-  DenseMap<Value, int> valueToIdx;
-  for (Operation &op : op->getRegion(0).getOps()) {
-    if (isa<VerifyConstraintInterface>(op)) {
-      assert(op.getNumResults() == 1);
-      valueToIdx[op.getResult(0)] = constrToValue.size();
-      constrToValue.push_back(op.getResult(0));
-    }
-  }
-
-  // Build the verifiers for each constraint slot
-  SmallVector<std::unique_ptr<Constraint>> constraints;
-  DenseMap<Value, Constraint *> valueToConstraint;
-  for (Value v : constrToValue) {
-    VerifyConstraintInterface op =
-        cast<VerifyConstraintInterface>(v.getDefiningOp());
-    std::unique_ptr<Constraint> verifier =
-        op.getVerifier(constrToValue, types, attrs);
-    assert(verifier && "Constraint verifier couldn't be generated");
-    valueToConstraint[v] = verifier.get();
-    constraints.push_back(std::move(verifier));
-  }
-
-  // The verifier, that will check that the operands/results satisfy the
-  // invariants.
+  // Get the IRDL verifier for this operation.
+  auto [constraints, valueToIdx] = getOperationVerifier(op);
   ConstraintVerifier verifier(constraints);
 
   auto operandsOp = op.getOp<OperandsOp>();
   SmallVector<Value> operands = {};
   if (operandsOp) {
     for (Value operand : operandsOp->getArgs()) {
-      auto satisfyingTypes =
-          getSatisfyingTypes(*ctx, valueToIdx[operand], verifier);
+      auto satisfyingTypes = getSatisfyingTypes(
+          *ctx, valueToIdx[operand], verifier, getAvailableTypes(*ctx));
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
@@ -114,8 +73,8 @@ LogicalResult addOperation(GeneratorInfo &info) {
   SmallVector<Type> resultTypes = {};
   if (resultsOp) {
     for (Value result : resultsOp->getArgs()) {
-      auto satisfyingTypes =
-          getSatisfyingTypes(*ctx, valueToIdx[result], verifier);
+      auto satisfyingTypes = getSatisfyingTypes(
+          *ctx, valueToIdx[result], verifier, getAvailableTypes(*ctx));
       if (satisfyingTypes.size() == 0)
         return failure();
       auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
