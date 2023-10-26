@@ -66,7 +66,11 @@ LogicalResult addOperation(GeneratorInfo &info, bool addFunctionArgs,
           verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
       assert(verified.succeeded());
 
-      operands.push_back(info.getValue(type, true));
+      auto value = info.getValue(type, addFunctionArgs);
+      if (!value.has_value()) {
+        return failure();
+      }
+      operands.push_back(*value);
     }
   }
 
@@ -108,7 +112,8 @@ LogicalResult addOperation(GeneratorInfo &info, bool addFunctionArgs,
 /// The program has at most `fuel` operations.
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
                                     ArrayRef<OperationOp> availableOps,
-                                    tree_guide::Chooser *chooser, int fuel) {
+                                    tree_guide::Chooser *chooser, int numOps,
+                                    int numArgs) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -121,17 +126,22 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   // Create an empty function, and set the insertion point in it.
   auto func = builder.create<func::FuncOp>(unknownLoc, "foo",
                                            FunctionType::get(&ctx, {}, {}));
-  func.setPrivate();
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
   // Create the generator info
   GeneratorInfo info(chooser, availableOps, builder);
 
+  auto availableTypes = getAvailableTypes(ctx);
+  // Add function arguments
+  for (int i = 0; i < numArgs; i++) {
+    auto type = availableTypes[chooser->choose(availableTypes.size())];
+    info.addFunctionArgument(type);
+  }
+
   // Select how many operations we want to generate, and generate them.
-  auto numOps = chooser->choose(fuel + 1);
   for (long i = 0; i < numOps; i++) {
-    if (addOperation(info, true, getAvailableTypes(ctx)).failed())
+    if (addOperation(info, false, getAvailableTypes(ctx)).failed())
       return nullptr;
   }
 
@@ -213,9 +223,10 @@ int main(int argc, char **argv) {
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
-  auto guide = tree_guide::BFSGuide(42);
+  auto guide = tree_guide::DefaultGuide();
+  // auto guide = tree_guide::BFSGuide(42);
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, availableOps, chooser.get(), 2);
+    auto module = createProgram(ctx, availableOps, chooser.get(), 10, 3);
     if (!module)
       continue;
     programCounter += 1;
@@ -234,14 +245,14 @@ int main(int argc, char **argv) {
     correctProgramCounter += 1;
 
     // Print the percentage of programs that are verifying
-    llvm::errs() << "Generated " << programCounter << " programs, "
-                 << (((float)correctProgramCounter / (float)programCounter) *
-                     100.0f)
-                 << "% verifying \n\n\n";
+    // llvm::errs() << "Generated " << programCounter << " programs, "
+    //              << (((float)correctProgramCounter / (float)programCounter) *
+    //                  100.0f)
+    //              << "% verifying \n\n\n";
 
     if (outputFolder == "-") {
-      module->dump();
-      continue;
+      module->print(llvm::outs());
+      break;
     }
 
     // Store the program in the output folder.

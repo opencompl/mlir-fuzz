@@ -52,9 +52,12 @@ struct GeneratorInfo {
 
   /// Get a value in the program.
   /// This may add a new argument to the function.
-  mlir::Value getValue(mlir::Type type, bool addAsArgument) {
+  std::optional<mlir::Value> getValue(mlir::Type type, bool addAsArgument) {
     auto &domValues = dominatingValues[type];
 
+    if (domValues.size() + addAsArgument == 0) {
+      return {};
+    }
     // For now, we assume that we are only generating values of the same type.
     auto choice = chooser->choose(domValues.size() + addAsArgument);
 
@@ -63,18 +66,18 @@ struct GeneratorInfo {
       return domValues[choice];
     }
 
+    return addFunctionArgument(type);
+  }
+
+  mlir::Value addFunctionArgument(mlir::Type type) {
     // Otherwise, add a new argument to the parent function.
     auto func = llvm::cast<mlir::func::FuncOp>(
         *builder.getInsertionBlock()->getParentOp());
 
-    // We first chose an index where to add this argument.
-    // Note that this is very costly when we are enumerating all programs of
-    // a certain size.
-    auto newArgIndex = chooser->choose(func.getNumArguments() + 1);
-
-    func.insertArgument(newArgIndex, type, {},
+    unsigned int position = func.getNumArguments();
+    func.insertArgument(position, type, {},
                         mlir::UnknownLoc::get(builder.getContext()));
-    auto arg = func.getArgument(newArgIndex);
+    auto arg = func.getArgument(position);
     addDominatingValue(arg);
     return arg;
   }
