@@ -30,15 +30,33 @@ using namespace irdl;
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
   return {builder.getIntegerType(1),  builder.getIntegerType(32),
-          builder.getIntegerType(64), builder.getIntegerType(17),
-          builder.getIntegerType(3),  builder.getIndexType(),
-          builder.getF32Type(),       builder.getF64Type()};
+          builder.getIntegerType(64), builder.getIntegerType(127),
+          builder.getIntegerType(17), builder.getIntegerType(3),
+          builder.getIndexType(),     builder.getF32Type(),
+          builder.getF64Type()};
+}
+
+Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
+  auto ctx = info.builder.getContext();
+  const std::vector<IntegerAttr> interestingValueList = {
+      IntegerAttr::get(type, -1), IntegerAttr::get(type, 0),
+      IntegerAttr::get(type, 1)};
+  size_t choice = info.chooser->choose(interestingValueList.size() + 1);
+  IntegerAttr value;
+  if (choice == interestingValueList.size()) {
+    value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
+  } else {
+    value = interestingValueList[choice];
+  }
+  auto typedValue = value.cast<TypedAttr>();
+  auto constant =
+      info.builder.create<arith::ConstantOp>(UnknownLoc::get(ctx), typedValue);
+  return constant.getResult();
 }
 
 /// Add a random operation at the insertion point.
 /// Return failure if no operations were added.
-LogicalResult addOperation(GeneratorInfo &info, bool addFunctionArgs,
-                           ArrayRef<Type> availableTypes) {
+LogicalResult addOperation(GeneratorInfo &info, ArrayRef<Type> availableTypes) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
 
@@ -66,7 +84,7 @@ LogicalResult addOperation(GeneratorInfo &info, bool addFunctionArgs,
           verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
       assert(verified.succeeded());
 
-      auto value = info.getValue(type, addFunctionArgs);
+      auto value = info.getValue(type);
       if (!value.has_value()) {
         return failure();
       }
@@ -141,7 +159,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
 
   // Select how many operations we want to generate, and generate them.
   for (long i = 0; i < numOps; i++) {
-    if (addOperation(info, false, getAvailableTypes(ctx)).failed())
+    if (addOperation(info, getAvailableTypes(ctx)).failed())
       return nullptr;
   }
 

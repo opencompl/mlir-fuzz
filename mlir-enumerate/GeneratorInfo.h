@@ -52,21 +52,14 @@ struct GeneratorInfo {
 
   /// Get a value in the program.
   /// This may add a new argument to the function.
-  std::optional<mlir::Value> getValue(mlir::Type type, bool addAsArgument) {
+  std::optional<mlir::Value> getValue(mlir::Type type) {
     auto &domValues = dominatingValues[type];
 
-    if (domValues.size() + addAsArgument == 0) {
+    if (domValues.size() == 0) {
       return {};
     }
-    // For now, we assume that we are only generating values of the same type.
-    auto choice = chooser->choose(domValues.size() + addAsArgument);
-
-    // If we chose a dominating value, return it
-    if (choice < (long)domValues.size()) {
-      return domValues[choice];
-    }
-
-    return addFunctionArgument(type);
+    auto choice = chooser->choose(domValues.size());
+    return domValues[choice];
   }
 
   mlir::Value addFunctionArgument(mlir::Type type) {
