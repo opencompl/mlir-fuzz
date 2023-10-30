@@ -32,8 +32,7 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   return {builder.getIntegerType(1),  builder.getIntegerType(32),
           builder.getIntegerType(64), builder.getIntegerType(127),
           builder.getIntegerType(17), builder.getIntegerType(3),
-          builder.getIndexType(),     builder.getF32Type(),
-          builder.getF64Type()};
+          builder.getIndexType()};
 }
 
 Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
@@ -52,6 +51,12 @@ Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
   auto constant =
       info.builder.create<arith::ConstantOp>(UnknownLoc::get(ctx), typedValue);
   return constant.getResult();
+}
+
+std::optional<Value> createValueOutOfThinAir(GeneratorInfo &info, Type type) {
+  if (auto intType = type.dyn_cast<IntegerType>())
+    return createIntegerValue(info, intType);
+  return {};
 }
 
 /// Add a random operation at the insertion point.
@@ -264,7 +269,8 @@ int main(int argc, char **argv) {
 
     // Print the percentage of programs that are verifying
     // llvm::errs() << "Generated " << programCounter << " programs, "
-    //              << (((float)correctProgramCounter / (float)programCounter) *
+    //              << (((float)correctProgramCounter / (float)programCounter)
+    //              *
     //                  100.0f)
     //              << "% verifying \n\n\n";
 
