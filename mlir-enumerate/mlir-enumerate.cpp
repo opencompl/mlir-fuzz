@@ -59,6 +59,35 @@ std::optional<Value> createValueOutOfThinAir(GeneratorInfo &info, Type type) {
   return {};
 }
 
+/// Return the list of operations that can have a particular result type as
+/// result.
+/// Returns as well the indices of the results that can have this result type.
+std::vector<std::pair<OperationOp, std::vector<int>>>
+getOperationsWithResultType(GeneratorInfo &info, Type resultType) {
+  auto builder = info.builder;
+  auto ctx = builder.getContext();
+
+  // Choose one operation that can support the resulting type.
+  // Also get the indices of result definitions that are satisfied by this type.
+  std::vector<std::pair<OperationOp, std::vector<int>>> availableOps;
+
+  for (auto op : info.availableOps) {
+    auto results = op.getOp<ResultsOp>();
+    if (!results)
+      continue;
+    std::vector<int> satisfiableResults;
+    for (auto [idx, resultDef] : llvm::enumerate(results->getOperands())) {
+      if (getSatisfyingTypes(*ctx, resultDef, op, {resultType}).empty())
+        satisfiableResults.push_back(idx);
+    }
+    if (satisfiableResults.empty())
+      continue;
+    availableOps.push_back({op, satisfiableResults});
+  }
+
+  return availableOps;
+}
+
 /// Add a random operation at the insertion point.
 /// Return failure if no operations were added.
 LogicalResult addOperation(GeneratorInfo &info, ArrayRef<Type> availableTypes) {
