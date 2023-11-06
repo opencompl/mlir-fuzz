@@ -25,6 +25,12 @@ getSatisfyingTypes(mlir::MLIRContext &ctx, int constraint,
                    mlir::irdl::ConstraintVerifier &context,
                    mlir::ArrayRef<mlir::Type> availableTypes);
 
+/// Get the types that a given value in an irdl operation can support.
+std::vector<mlir::Type>
+getSatisfyingTypes(mlir::MLIRContext &ctx, mlir::Value value,
+                   mlir::irdl::OperationOp op,
+                   mlir::ArrayRef<mlir::Type> availableTypes);
+
 /// Get the IRDL constraint verifier from an Operation.
 std::pair<std::vector<std::unique_ptr<mlir::irdl::Constraint>>,
           mlir::DenseMap<mlir::Value, int>>

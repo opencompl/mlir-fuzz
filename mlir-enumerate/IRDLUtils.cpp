@@ -17,6 +17,14 @@ std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, int constraint,
   return satisfyingTypes;
 }
 
+std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, Value value,
+                                     OperationOp op,
+                                     ArrayRef<Type> availableTypes) {
+  auto [constraints, valueToIdx] = getOperationVerifier(op);
+  ConstraintVerifier verifier(constraints);
+  return getSatisfyingTypes(ctx, valueToIdx[value], verifier, availableTypes);
+}
+
 std::pair<std::vector<std::unique_ptr<Constraint>>, DenseMap<Value, int>>
 getOperationVerifier(OperationOp op) {
   // We do not handle dynamic tyes and attributes yet.
