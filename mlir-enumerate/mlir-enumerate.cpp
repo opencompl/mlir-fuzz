@@ -85,6 +85,106 @@ getOperationsWithResultType(GeneratorInfo &info, Type resultType) {
   return availableOps;
 }
 
+/// Add an operation with a given result type.
+/// Return the result that has has the requested type.
+/// This function will also create a number proportional to `fuel` operations.
+std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
+                                        int fuel) {
+  auto builder = info.builder;
+  auto ctx = builder.getContext();
+  auto availableTypes = getAvailableTypes(*ctx);
+
+  auto operations = getOperationsWithResultType(info, resultType);
+  if (operations.empty())
+    return {};
+
+  auto [op, possibleResults] =
+      operations[info.chooser->choose(operations.size())];
+  size_t resultIdx =
+      possibleResults[info.chooser->choose(possibleResults.size())];
+
+  // Create a new verifier that will keep track of the values we have already
+  // assigned.
+  auto [constraints, valueToIdx] = getOperationVerifier(op);
+  auto verifier = ConstraintVerifier(constraints);
+
+  // Add to the constraint verifier our set result.
+  auto succeeded =
+      verifier.verify({}, TypeAttr::get(resultType),
+                      valueToIdx[getResultsConstraints(op)[resultIdx]]);
+  assert(succeeded.succeeded());
+
+  std::vector<Value> operands;
+  for (auto operand : getOperandsConstraints(op)) {
+    auto satisfyingTypes =
+        getSatisfyingTypes(*ctx, valueToIdx[operand], verifier, availableTypes);
+    if (satisfyingTypes.size() == 0)
+      return {};
+
+    auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
+    auto succeeded =
+        verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
+    assert(succeeded.succeeded());
+
+    int operandFuel = info.chooser->choose(fuel + 1);
+    fuel -= operandFuel;
+
+    if (operandFuel == 0) {
+      auto argument = info.getValue(type);
+      if (argument) {
+        operands.push_back(*argument);
+        continue;
+      }
+      auto thinAirValue = createValueOutOfThinAir(info, type);
+      if (thinAirValue)
+        operands.push_back(*thinAirValue);
+
+      operands.push_back(info.addFunctionArgument(type));
+      continue;
+    }
+
+    auto val = addRootedOperation(info, type, operandFuel);
+    if (!val) {
+      operands.push_back(info.addFunctionArgument(type));
+      continue;
+    }
+
+    operands.push_back(*val);
+  }
+
+  std::vector<Type> resultTypes;
+  for (auto [idx, result] : llvm::enumerate(getResultsConstraints(op))) {
+    if (resultIdx == idx) {
+      resultTypes.push_back(resultType);
+      continue;
+    }
+
+    auto satisfyingTypes =
+        getSatisfyingTypes(*ctx, valueToIdx[result], verifier, availableTypes);
+    if (satisfyingTypes.size() == 0)
+      return {};
+
+    auto type = satisfyingTypes[info.chooser->choose(satisfyingTypes.size())];
+    auto succeeded =
+        verifier.verify({}, TypeAttr::get(type), valueToIdx[result]);
+    assert(succeeded.succeeded());
+    resultTypes.push_back(type);
+  }
+
+  StringRef dialectName = op.getParentOp().getName();
+  StringRef opSuffix = op.getNameAttr().getValue();
+  StringAttr opName = StringAttr::get(ctx, dialectName + "." + opSuffix);
+
+  // Create the operation.
+  auto *operation =
+      builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes);
+  for (auto result : operation->getResults()) {
+    info.addDominatingValue(result);
+  }
+
+  return operation->getResult(resultIdx);
+}
+
 /// Add a random operation at the insertion point.
 /// Return failure if no operations were added.
 LogicalResult addOperation(GeneratorInfo &info, ArrayRef<Type> availableTypes) {
@@ -188,22 +288,13 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
     info.addFunctionArgument(type);
   }
 
-  // Select how many operations we want to generate, and generate them.
-  for (long i = 0; i < numOps; i++) {
-    if (addOperation(info, getAvailableTypes(ctx)).failed())
-      return nullptr;
-  }
+  auto type = availableTypes[chooser->choose(availableTypes.size())];
+  auto root = addRootedOperation(info, type, numOps);
+  if (!root)
+    return {};
+  builder.create<func::ReturnOp>(unknownLoc, *root);
+  func.insertResult(0, root->getType(), {});
 
-  std::vector<Value> values;
-  for (auto v : info.dominatingValues)
-    values.insert(values.end(), v.second.begin(), v.second.end());
-
-  if (values.empty())
-    return module;
-
-  auto value = values[chooser->choose(values.size())];
-  builder.create<func::ReturnOp>(unknownLoc, value);
-  func.insertResult(0, value.getType(), {});
   return module;
 }
 
