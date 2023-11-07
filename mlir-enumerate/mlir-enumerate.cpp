@@ -72,11 +72,8 @@ getOperationsWithResultType(GeneratorInfo &info, Type resultType) {
   std::vector<std::pair<OperationOp, std::vector<int>>> availableOps;
 
   for (auto op : info.availableOps) {
-    auto results = op.getOp<ResultsOp>();
-    if (!results)
-      continue;
     std::vector<int> satisfiableResults;
-    for (auto [idx, resultDef] : llvm::enumerate(results->getOperands())) {
+    for (auto [idx, resultDef] : llvm::enumerate(getResultsConstraints(op))) {
       if (getSatisfyingTypes(*ctx, resultDef, op, {resultType}).empty())
         satisfiableResults.push_back(idx);
     }
