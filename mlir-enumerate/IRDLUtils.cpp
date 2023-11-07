@@ -57,3 +57,24 @@ getOperationVerifier(OperationOp op) {
 
   return {std::move(constraints), std::move(valueToIdx)};
 }
+
+std::vector<Value> getOperandsConstraints(OperationOp op) {
+  auto operandsOp = op.getOp<OperandsOp>();
+  if (!operandsOp)
+    return {};
+  std::vector<Value> res;
+  res.insert(res.begin(), operandsOp->getOperands().begin(),
+             operandsOp->getOperands().end());
+  return res;
+}
+
+/// Get the result constraints as a list of values.
+std::vector<mlir::Value> getResultsConstraints(mlir::irdl::OperationOp op) {
+  auto resultsOp = op.getOp<ResultsOp>();
+  if (!resultsOp)
+    return {};
+  std::vector<Value> res;
+  res.insert(res.begin(), resultsOp->getOperands().begin(),
+             resultsOp->getOperands().end());
+  return res;
+}

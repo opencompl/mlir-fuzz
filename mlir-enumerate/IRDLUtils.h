@@ -36,4 +36,10 @@ std::pair<std::vector<std::unique_ptr<mlir::irdl::Constraint>>,
           mlir::DenseMap<mlir::Value, int>>
 getOperationVerifier(mlir::irdl::OperationOp op);
 
+/// Get the operands constraints as a list of values.
+std::vector<mlir::Value> getOperandsConstraints(mlir::irdl::OperationOp op);
+
+/// Get the result constraints as a list of values.
+std::vector<mlir::Value> getResultsConstraints(mlir::irdl::OperationOp op);
+
 #endif // IRDL_UTILS_H
