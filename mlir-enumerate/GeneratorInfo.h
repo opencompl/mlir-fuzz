@@ -51,7 +51,6 @@ struct GeneratorInfo {
   }
 
   /// Get a value in the program.
-  /// This may add a new argument to the function.
   std::optional<mlir::Value> getValue(mlir::Type type) {
     auto &domValues = dominatingValues[type];
 
