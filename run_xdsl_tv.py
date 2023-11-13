@@ -2,6 +2,8 @@
 
 import subprocess
 
+num_ran = 0
+
 
 def run_once() -> None:
     res = subprocess.run(
@@ -15,7 +17,9 @@ def run_once() -> None:
 
     if "unsat" not in res.stdout:
         raise Exception("Failed translation validation")
-    print("nice")
+    global num_ran
+    num_ran += 1
+    print(f"{num_ran} succeeded")
 
 
 while True:
