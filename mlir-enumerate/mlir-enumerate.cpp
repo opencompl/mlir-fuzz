@@ -136,8 +136,10 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
         continue;
       }
       auto thinAirValue = createValueOutOfThinAir(info, type);
-      if (thinAirValue)
+      if (thinAirValue) {
         operands.push_back(*thinAirValue);
+        continue;
+      }
 
       operands.push_back(info.addFunctionArgument(type));
       continue;
