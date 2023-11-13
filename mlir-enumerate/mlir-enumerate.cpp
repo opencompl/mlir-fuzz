@@ -67,8 +67,15 @@ getOperationsWithResultType(GeneratorInfo &info, Type resultType) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
 
+  static DenseMap<Type, std::vector<std::pair<OperationOp, std::vector<int>>>>
+      memoization({});
+  auto memoized_it = memoization.find(resultType);
+  if (memoized_it != memoization.end())
+    return memoized_it->second;
+
   // Choose one operation that can support the resulting type.
-  // Also get the indices of result definitions that are satisfied by this type.
+  // Also get the indices of result definitions that are satisfied by this
+  // type.
   std::vector<std::pair<OperationOp, std::vector<int>>> availableOps;
 
   for (auto op : info.availableOps) {
@@ -81,6 +88,8 @@ getOperationsWithResultType(GeneratorInfo &info, Type resultType) {
       continue;
     availableOps.push_back({op, satisfiableResults});
   }
+
+  memoization.insert({resultType, availableOps});
 
   return availableOps;
 }
