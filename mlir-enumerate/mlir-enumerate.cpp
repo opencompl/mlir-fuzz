@@ -153,11 +153,11 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
         operands.push_back(*argument);
         continue;
       }
-      // auto thinAirValue = createValueOutOfThinAir(info, type);
-      //  if (thinAirValue) {
-      //    operands.push_back(*thinAirValue);
-      //    continue;
-      //  }
+      auto thinAirValue = createValueOutOfThinAir(info, type);
+      if (thinAirValue) {
+        operands.push_back(*thinAirValue);
+        continue;
+      }
 
       operands.push_back(info.addFunctionArgument(type));
       continue;
@@ -295,7 +295,7 @@ LogicalResult addOperation(GeneratorInfo &info, ArrayRef<Type> availableTypes) {
 OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
                                     ArrayRef<OperationOp> availableOps,
                                     tree_guide::Chooser *chooser, int numOps,
-                                    int numArgs) {
+                                    int numArgs, int seed) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -308,6 +308,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   // Create an empty function, and set the insertion point in it.
   auto func = builder.create<func::FuncOp>(unknownLoc, "foo",
                                            FunctionType::get(&ctx, {}, {}));
+  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
@@ -401,9 +402,9 @@ int main(int argc, char **argv) {
   int seed = dist(rd);
 
   llvm::errs() << "seed " << seed << "\n";
-  auto guide = tree_guide::DefaultGuide(526557841);
+  auto guide = tree_guide::DefaultGuide(seed);
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, availableOps, chooser.get(), 100, 3);
+    auto module = createProgram(ctx, availableOps, chooser.get(), 100, 3, seed);
     if (!module)
       continue;
     programCounter += 1;
