@@ -29,10 +29,18 @@ using namespace irdl;
 /// Get the types that the fuzzer supports.
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getIntegerType(1),  builder.getIntegerType(32),
-          builder.getIntegerType(64), builder.getIntegerType(127),
-          builder.getIntegerType(17), builder.getIntegerType(3),
-          builder.getIndexType()};
+  return {builder.getIntegerType(1), builder.getIntegerType(81),
+          builder.getIntegerType(35)};
+}
+
+/// Get the types that the fuzzer supports.
+std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx) {
+  Builder builder(&ctx);
+  return {builder.getI64IntegerAttr(0), builder.getI64IntegerAttr(1),
+          builder.getI64IntegerAttr(2), builder.getI64IntegerAttr(3),
+          builder.getI64IntegerAttr(4), builder.getI64IntegerAttr(5),
+          builder.getI64IntegerAttr(6), builder.getI64IntegerAttr(7),
+          builder.getI64IntegerAttr(8), builder.getI64IntegerAttr(9)};
 }
 
 Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
@@ -102,6 +110,7 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
   auto builder = info.builder;
   auto ctx = builder.getContext();
   auto availableTypes = getAvailableTypes(*ctx);
+  auto availableAttrs = getAvailableAttributes(*ctx);
 
   auto operations = getOperationsWithResultType(info, resultType);
   if (operations.empty())
@@ -144,11 +153,11 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
         operands.push_back(*argument);
         continue;
       }
-      auto thinAirValue = createValueOutOfThinAir(info, type);
-      if (thinAirValue) {
-        operands.push_back(*thinAirValue);
-        continue;
-      }
+      // auto thinAirValue = createValueOutOfThinAir(info, type);
+      //  if (thinAirValue) {
+      //    operands.push_back(*thinAirValue);
+      //    continue;
+      //  }
 
       operands.push_back(info.addFunctionArgument(type));
       continue;
@@ -182,13 +191,26 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
     resultTypes.push_back(type);
   }
 
+  std::vector<NamedAttribute> attributes;
+  for (auto [name, constraint] : getAttributesConstraints(op)) {
+    auto satisfyingAttrs = getSatisfyingAttrs(*ctx, valueToIdx[constraint],
+                                              verifier, availableAttrs);
+    if (satisfyingAttrs.size() == 0)
+      return {};
+
+    auto attr = satisfyingAttrs[info.chooser->choose(satisfyingAttrs.size())];
+    auto succeeded = verifier.verify({}, attr, valueToIdx[constraint]);
+    assert(succeeded.succeeded());
+    attributes.emplace_back(StringAttr::get(ctx, name), attr);
+  }
+
   StringRef dialectName = op.getParentOp().getName();
   StringRef opSuffix = op.getNameAttr().getValue();
   StringAttr opName = StringAttr::get(ctx, dialectName + "." + opSuffix);
 
   // Create the operation.
-  auto *operation =
-      builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes);
+  auto *operation = builder.create(UnknownLoc::get(ctx), opName, operands,
+                                   resultTypes, attributes);
   for (auto result : operation->getResults()) {
     info.addDominatingValue(result);
   }
@@ -374,10 +396,14 @@ int main(int argc, char **argv) {
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
-  auto guide = tree_guide::DefaultGuide();
-  // auto guide = tree_guide::BFSGuide(42);
+  std::random_device rd;
+  std::uniform_int_distribution<int> dist(0, 1 << 30);
+  int seed = dist(rd);
+
+  llvm::errs() << "seed " << seed << "\n";
+  auto guide = tree_guide::DefaultGuide(526557841);
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, availableOps, chooser.get(), 10, 3);
+    auto module = createProgram(ctx, availableOps, chooser.get(), 100, 3);
     if (!module)
       continue;
     programCounter += 1;

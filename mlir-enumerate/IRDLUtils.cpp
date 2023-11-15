@@ -3,18 +3,43 @@
 using namespace mlir;
 using namespace irdl;
 
+/// Get the attributes that the constraint can support, given a constraint
+/// context.
+std::vector<Attribute> getSatisfyingAttrs(MLIRContext &ctx, int constraint,
+                                          ConstraintVerifier &context,
+                                          ArrayRef<Attribute> availableAttrs) {
+  std::vector<Attribute> satisfyingAttrs;
+  for (auto attr : availableAttrs) {
+    ConstraintVerifier context_copy = context;
+    if (context_copy.verify({}, attr, constraint).succeeded()) {
+      satisfyingAttrs.push_back(attr);
+    }
+  }
+  return satisfyingAttrs;
+}
+
+std::vector<Attribute> getSatisfyingAttrs(MLIRContext &ctx, Value value,
+                                          OperationOp op,
+                                          ArrayRef<Attribute> availableAttrs) {
+  auto [constraints, valueToIdx] = getOperationVerifier(op);
+  ConstraintVerifier verifier(constraints);
+  return getSatisfyingAttrs(ctx, valueToIdx[value], verifier, availableAttrs);
+}
+
 /// Get the types that the constraint can support, given a constraint context.
 std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, int constraint,
                                      ConstraintVerifier &context,
                                      ArrayRef<Type> availableTypes) {
-  std::vector<Type> satisfyingTypes;
+  std::vector<Attribute> availableAttrs;
   for (auto type : availableTypes) {
-    ConstraintVerifier context_copy = context;
-    if (context_copy.verify({}, TypeAttr::get(type), constraint).succeeded()) {
-      satisfyingTypes.push_back(type);
-    }
+    availableAttrs.push_back(TypeAttr::get(type));
   }
-  return satisfyingTypes;
+  auto res = getSatisfyingAttrs(ctx, constraint, context, availableAttrs);
+  std::vector<Type> resType;
+  for (auto attr : res) {
+    resType.push_back(attr.cast<TypeAttr>().getValue());
+  }
+  return resType;
 }
 
 std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, Value value,
@@ -76,5 +101,19 @@ std::vector<mlir::Value> getResultsConstraints(mlir::irdl::OperationOp op) {
   std::vector<Value> res;
   res.insert(res.begin(), resultsOp->getOperands().begin(),
              resultsOp->getOperands().end());
+  return res;
+}
+
+std::vector<std::pair<StringRef, mlir::Value>>
+getAttributesConstraints(mlir::irdl::OperationOp op) {
+  auto attrOp = op.getOp<AttributesOp>();
+  if (!attrOp)
+    return {};
+  auto attrNames = attrOp->getAttributeValueNames();
+  auto attrValues = attrOp->getAttributeValues();
+
+  std::vector<std::pair<StringRef, mlir::Value>> res;
+  for (size_t i = 0; i < attrNames.size(); i++)
+    res.emplace_back(attrNames[i].cast<StringAttr>().getValue(), attrValues[i]);
   return res;
 }

@@ -19,6 +19,20 @@
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 
+/// Get the attributes that the constraint can support, given a constraint
+/// context.
+std::vector<mlir::Attribute>
+getSatisfyingAttrs(mlir::MLIRContext &ctx, int constraint,
+                   mlir::irdl::ConstraintVerifier &context,
+                   mlir::ArrayRef<mlir::Attribute> availableAttrs);
+
+/// Get the attributes that the constraint can support, given a constraint
+/// context.
+std::vector<mlir::Attribute>
+getSatisfyingAttrs(mlir::MLIRContext &ctx, mlir::Value value,
+                   mlir::irdl::OperationOp op,
+                   mlir::ArrayRef<mlir::Attribute> availableAttrs);
+
 /// Get the types that the constraint can support, given a constraint context.
 std::vector<mlir::Type>
 getSatisfyingTypes(mlir::MLIRContext &ctx, int constraint,
@@ -41,5 +55,9 @@ std::vector<mlir::Value> getOperandsConstraints(mlir::irdl::OperationOp op);
 
 /// Get the result constraints as a list of values.
 std::vector<mlir::Value> getResultsConstraints(mlir::irdl::OperationOp op);
+
+/// Get the attribute constraints as a list of names and values.
+std::vector<std::pair<mlir::StringRef, mlir::Value>>
+getAttributesConstraints(mlir::irdl::OperationOp op);
 
 #endif // IRDL_UTILS_H
