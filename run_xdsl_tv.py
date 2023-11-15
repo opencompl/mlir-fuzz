@@ -21,7 +21,8 @@ def run_once(id: int) -> None:
 
     global num_ran
     num_ran += 1
-    print(f"{num_ran} succeeded")
+    if num_ran % 100 == 0:
+        print(f"{num_ran} succeeded")
 
 
 def run_indifinitely(id: int) -> None:
