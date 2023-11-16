@@ -7,6 +7,7 @@ num_ran = 0
 
 
 def run_once(id: int) -> None:
+    global num_ran
     res = subprocess.run(
         f"./build/bin/mlir-enumerate dialects/arith.mlir | mlir-opt --mlir-print-op-generic -o tmp/test{id}.mlir && mlir-opt --canonicalize --mlir-print-op-generic tmp/test{id}.mlir -o tmp/test{id}-opt.mlir && xdsl-tv tmp/test{id}.mlir tmp/test{id}-opt.mlir | z3 -in",
         capture_output=True,
@@ -17,9 +18,12 @@ def run_once(id: int) -> None:
         raise Exception(f"Process {id} failed: " + res.stderr)
 
     if "unsat" not in res.stdout:
-        raise Exception(f"Process {id} failed translation validation")
+        subprocess.run(
+            f"mv tmp/test{id}.mlir miscompilations/test{num_ran}.mlir",
+            shell=True
+        )
+        print(f"Found miscompilation {num_ran}!")
 
-    global num_ran
     num_ran += 1
     if num_ran % 100 == 0:
         print(f"{num_ran} succeeded")
