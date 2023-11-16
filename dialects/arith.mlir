@@ -1786,12 +1786,12 @@ module {
       irdl.results(%T)
     }
 
-    irdl.operation @select {
-      %i1 = irdl.is i1
-      %T = irdl.any
-      irdl.operands(%i1, %T, %T)
-      irdl.results(%T)
-    }
+//    irdl.operation @select {
+//      %i1 = irdl.is i1
+//      %T = irdl.any
+//      irdl.operands(%i1, %T, %T)
+//      irdl.results(%T)
+//    }
 
     irdl.operation @shli {
       %i1 = irdl.is i1
