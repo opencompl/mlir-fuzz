@@ -15,7 +15,9 @@ IRDL and to avoid generating programs that do not verify.
   - `./utils/build.sh`
 
 ## Running
+First create the generation dir: `mkdir generated`.
 
-`./build/bin/mlir-enumerate dialects/arith.irdl -o generated` will run the
+
+`./build/bin/mlir-enumerate dialects/arith.mlir -o generated` will run the
 enumerator with the `arith` dialect, and generate the programs in the
 `generated` folder.
