@@ -21,3 +21,24 @@ First create the generation dir: `mkdir generated`.
 `./build/bin/mlir-enumerate dialects/arith.mlir -o generated` will run the
 enumerator with the `arith` dialect, and generate the programs in the
 `generated` folder.
+
+## Testing MLIR code with xDSL-smt
+
+The [`xdsl-smt`](https://github.com/opencompl/xdsl-smt) project has a
+translation validation tool for `arith` that we can use to test random
+programs. The `run_xdsl_tv.py` script will run the translation validation
+tool on randomly generated programs.
+
+```bash
+# Install xdsl-smt in a virtual environment
+cd PATH_TO_XDSL_SMT
+python -m venv venv
+source venv/bin/activate
+pip install -e .
+
+# Generate random programs and run the translation validation tool
+cd PATH_TO_MLIR_FUZZ
+python run_xdsl_tv.py
+```
+
+To test different passes, modify the `is-miscompiling.sh` script.
