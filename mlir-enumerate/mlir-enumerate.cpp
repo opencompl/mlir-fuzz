@@ -29,8 +29,8 @@ using namespace irdl;
 /// Get the types that the fuzzer supports.
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getIntegerType(1), builder.getIntegerType(81),
-          builder.getIntegerType(35)};
+  return {builder.getIntegerType(1), builder.getIntegerType(8),
+          builder.getIntegerType(32)};
 }
 
 /// Get the types that the fuzzer supports.
