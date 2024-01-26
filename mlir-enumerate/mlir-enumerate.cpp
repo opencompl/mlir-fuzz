@@ -43,50 +43,6 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx) {
           builder.getI64IntegerAttr(8), builder.getI64IntegerAttr(9)};
 }
 
-/// Create a random program, given the decisions taken from chooser.
-/// The program has at most `fuel` operations.
-OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
-                                    ArrayRef<OperationOp> availableOps,
-                                    tree_guide::Chooser *chooser, int numOps,
-                                    int numArgs, int seed) {
-  // Create an empty module.
-  auto unknownLoc = UnknownLoc::get(&ctx);
-  OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
-
-  // Create the builder, and set its insertion point in the module.
-  OpBuilder builder(&ctx);
-  auto &moduleBlock = module->getRegion().getBlocks().front();
-  builder.setInsertionPoint(&moduleBlock, moduleBlock.begin());
-
-  // Create an empty function, and set the insertion point in it.
-  auto func = builder.create<func::FuncOp>(unknownLoc, "foo",
-                                           FunctionType::get(&ctx, {}, {}));
-  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
-  auto &funcBlock = func.getBody().emplaceBlock();
-  builder.setInsertionPoint(&funcBlock, funcBlock.begin());
-
-  // Create the generator info
-  auto availableTypes = getAvailableTypes(ctx);
-  auto availableAttributes = getAvailableAttributes(ctx);
-  GeneratorInfo info(chooser, builder, availableOps, availableTypes,
-                     availableAttributes);
-
-  // Add function arguments
-  for (int i = 0; i < numArgs; i++) {
-    auto type = availableTypes[chooser->choose(availableTypes.size())];
-    info.addFunctionArgument(type);
-  }
-
-  auto type = availableTypes[chooser->choose(availableTypes.size())];
-  auto root = info.addRootedOperation(type, numOps);
-  if (!root)
-    return {};
-  builder.create<func::ReturnOp>(unknownLoc, *root);
-  func.insertResult(0, root->getType(), {});
-
-  return module;
-}
-
 /// Parse a file containing the dialects that we want to use.
 std::optional<OwningOpRef<ModuleOp>>
 parseIRDLDialects(MLIRContext &ctx, StringRef inputFilename) {
@@ -159,7 +115,9 @@ int main(int argc, char **argv) {
   llvm::errs() << "seed " << seed << "\n";
   auto guide = tree_guide::DefaultGuide(seed);
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, availableOps, chooser.get(), 100, 3, seed);
+    auto module =
+        createProgram(ctx, availableOps, getAvailableTypes(ctx),
+                      getAvailableAttributes(ctx), chooser.get(), 100, 3, seed);
     if (!module)
       continue;
     programCounter += 1;

@@ -18,7 +18,25 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Support/LLVM.h"
+
+namespace tree_guide {
+class Chooser;
+}
+
+namespace mlir {
+class ModuleOp;
+}
+
+/// Create a random program, given the decisions taken from chooser.
+/// The program has at most `fuel` operations.
+mlir::OwningOpRef<mlir::ModuleOp>
+createProgram(mlir::MLIRContext &ctx,
+              mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+              mlir::ArrayRef<mlir::Type> availableTypes,
+              mlir::ArrayRef<mlir::Attribute> availableAttributes,
+              tree_guide::Chooser *chooser, int numOps, int numArgs, int seed);
 
 /// Data structure to hold some information about the current program
 /// being generated.
