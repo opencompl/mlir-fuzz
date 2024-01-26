@@ -1,4 +1,4 @@
-//===- tblgen-extract.cpp --------------------------------------*- C++ -*-===//
+//===- GeneratorInfo.h ------------------------------------------*- C++ -*-===//
 //
 // This file is licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -82,6 +82,21 @@ struct GeneratorInfo {
     addDominatingValue(arg);
     return arg;
   }
+
+  /// Create a value of the given type, by materializing a constant.
+  std::optional<mlir::Value> createValueOutOfThinAir(mlir::Type type);
+
+  /// Return the list of operations that can have a particular result type as
+  /// result.
+  /// Returns as well the indices of the results that can have this result type.
+  std::vector<std::pair<mlir::irdl::OperationOp, std::vector<int>>>
+  getOperationsWithResultType(mlir::Type resultType);
+
+  /// Add an operation with a given result type.
+  /// Return the result that has has the requested type.
+  /// This function will also create a number proportional to `fuel` operations.
+  std::optional<mlir::Value> addRootedOperation(mlir::Type resultType,
+                                                int fuel);
 };
 
 #endif // MLIR_FUZZ_GENERATOR_INFO_H
