@@ -26,11 +26,17 @@ struct GeneratorInfo {
   /// The chooser, which will chose which path to take in the decision tree.
   tree_guide::Chooser *chooser;
 
+  /// A builder set to the end of the function.
+  mlir::OpBuilder builder;
+
   /// All available ops that can be used by the fuzzer.
   mlir::ArrayRef<mlir::irdl::OperationOp> availableOps;
 
-  /// A builder set to the end of the function.
-  mlir::OpBuilder builder;
+  /// All available types that can be used by the fuzzer.
+  mlir::ArrayRef<mlir::Type> availableTypes;
+
+  /// All available attributes that can be used by the fuzzer.
+  mlir::ArrayRef<mlir::Attribute> availableAttributes;
 
   /// The set of values that are dominating the insertion point.
   /// We group the values by their type.
@@ -40,10 +46,13 @@ struct GeneratorInfo {
   /// need to remove elements from this set.
   llvm::DenseMap<mlir::Type, std::vector<mlir::Value>> dominatingValues;
 
-  GeneratorInfo(tree_guide::Chooser *chooser,
+  GeneratorInfo(tree_guide::Chooser *chooser, mlir::OpBuilder builder,
                 mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
-                mlir::OpBuilder builder)
-      : chooser(chooser), availableOps(availableOps), builder(builder) {}
+                mlir::ArrayRef<mlir::Type> availableTypes,
+                mlir::ArrayRef<mlir::Attribute> availableAttributes)
+      : chooser(chooser), builder(builder), availableOps(availableOps),
+        availableTypes(availableTypes),
+        availableAttributes(availableAttributes) {}
 
   /// Add a value to the list of available values.
   void addDominatingValue(mlir::Value value) {

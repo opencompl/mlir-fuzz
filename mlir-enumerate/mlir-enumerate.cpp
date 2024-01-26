@@ -109,8 +109,6 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
                                         int fuel) {
   auto builder = info.builder;
   auto ctx = builder.getContext();
-  auto availableTypes = getAvailableTypes(*ctx);
-  auto availableAttrs = getAvailableAttributes(*ctx);
 
   auto operations = getOperationsWithResultType(info, resultType);
   if (operations.empty())
@@ -134,8 +132,8 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
 
   std::vector<Value> operands;
   for (auto operand : getOperandsConstraints(op)) {
-    auto satisfyingTypes =
-        getSatisfyingTypes(*ctx, valueToIdx[operand], verifier, availableTypes);
+    auto satisfyingTypes = getSatisfyingTypes(*ctx, valueToIdx[operand],
+                                              verifier, info.availableTypes);
     if (satisfyingTypes.size() == 0)
       return {};
 
@@ -179,8 +177,8 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
       continue;
     }
 
-    auto satisfyingTypes =
-        getSatisfyingTypes(*ctx, valueToIdx[result], verifier, availableTypes);
+    auto satisfyingTypes = getSatisfyingTypes(*ctx, valueToIdx[result],
+                                              verifier, info.availableTypes);
     if (satisfyingTypes.size() == 0)
       return {};
 
@@ -193,8 +191,8 @@ std::optional<Value> addRootedOperation(GeneratorInfo &info, Type resultType,
 
   std::vector<NamedAttribute> attributes;
   for (auto [name, constraint] : getAttributesConstraints(op)) {
-    auto satisfyingAttrs = getSatisfyingAttrs(*ctx, valueToIdx[constraint],
-                                              verifier, availableAttrs);
+    auto satisfyingAttrs = getSatisfyingAttrs(
+        *ctx, valueToIdx[constraint], verifier, info.availableAttributes);
     if (satisfyingAttrs.size() == 0)
       return {};
 
@@ -313,9 +311,11 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
   // Create the generator info
-  GeneratorInfo info(chooser, availableOps, builder);
-
   auto availableTypes = getAvailableTypes(ctx);
+  auto availableAttributes = getAvailableAttributes(ctx);
+  GeneratorInfo info(chooser, builder, availableOps, availableTypes,
+                     availableAttributes);
+
   // Add function arguments
   for (int i = 0; i < numArgs; i++) {
     auto type = availableTypes[chooser->choose(availableTypes.size())];
