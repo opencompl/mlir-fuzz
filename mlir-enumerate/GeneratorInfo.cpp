@@ -45,6 +45,12 @@ std::optional<Value> GeneratorInfo::createValueOutOfThinAir(Type type) {
 /// Returns as well the indices of the results that can have this result type.
 std::vector<std::pair<OperationOp, std::vector<int>>>
 GeneratorInfo::getOperationsWithResultType(Type resultType) {
+  static DenseMap<Type, std::vector<std::pair<OperationOp, std::vector<int>>>>
+      memoization;
+
+  if (memoization.find(resultType) != memoization.end())
+    return memoization[resultType];
+
   auto ctx = builder.getContext();
 
   // Choose one operation that can support the resulting type.
@@ -63,15 +69,21 @@ GeneratorInfo::getOperationsWithResultType(Type resultType) {
     res.push_back({op, satisfiableResults});
   }
 
+  memoization[resultType] = res;
+
   return res;
 }
 
 /// Add an operation with a given result type.
 /// Return the result that has has the requested type.
-/// This function will also create a number proportional to `fuel` operations.
+/// This function will also create a number of operations less than `fuel`
+/// operations.
 std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
                                                        int fuel) {
   auto ctx = builder.getContext();
+
+  // Cost of the current operation being created.
+  fuel -= 1;
 
   auto operations = getOperationsWithResultType(resultType);
   if (operations.empty())
