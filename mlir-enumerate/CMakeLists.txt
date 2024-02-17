@@ -6,7 +6,7 @@ set(LIBS
         MLIROptLib
         )
 
-add_llvm_executable(mlir-enumerate mlir-enumerate.cpp IRDLUtils.cpp GeneratorInfo.cpp)
+add_llvm_executable(mlir-enumerate mlir-enumerate.cpp IRDLUtils.cpp GeneratorInfo.cpp CLITool.cpp)
 
 llvm_update_compile_flags(mlir-enumerate)
 target_link_libraries(mlir-enumerate PRIVATE ${LIBS})
