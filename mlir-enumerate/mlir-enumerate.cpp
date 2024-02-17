@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
   MLIRContext ctx;
+  ctx.allowUnregisteredDialects();
 
   // Register all dialects
   DialectRegistry registry;
