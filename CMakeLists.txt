@@ -45,4 +45,3 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(mlir-enumerate)
-add_subdirectory(experimental)
