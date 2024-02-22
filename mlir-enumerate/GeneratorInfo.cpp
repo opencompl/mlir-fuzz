@@ -35,6 +35,13 @@ static Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
 }
 
 std::optional<Value> GeneratorInfo::createValueOutOfThinAir(Type type) {
+  auto func = llvm::cast<mlir::func::FuncOp>(
+      *builder.getInsertionBlock()->getParentOp());
+  // We don't add more than two arguments for now.
+  // TODO: Make this a proper parameter / CLI argument.
+  if (func.getNumArguments() < 2 && chooser->choose(2) == 0)
+    return addFunctionArgument(type);
+
   if (auto intType = type.dyn_cast<IntegerType>())
     return createIntegerValue(*this, intType);
   return {};

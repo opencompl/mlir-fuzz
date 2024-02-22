@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
                                 getAvailableAttributes(ctx), chooser.get(), 2,
-                                3, correctProgramCounter);
+                                0, correctProgramCounter);
     if (!module)
       continue;
     programCounter += 1;
