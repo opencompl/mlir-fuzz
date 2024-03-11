@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
   auto guide = tree_guide::BFSGuide();
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
-                                getAvailableAttributes(ctx), chooser.get(), 2,
+                                getAvailableAttributes(ctx), chooser.get(), 3,
                                 0, correctProgramCounter);
     if (!module)
       continue;

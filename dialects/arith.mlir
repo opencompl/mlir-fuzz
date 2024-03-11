@@ -22,12 +22,12 @@ module {
       irdl.results(%integer)
     }
 
-    irdl.operation @addui_extended {
-      %integer = irdl.base "!builtin.integer"
-      %i1 = irdl.is i1
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer, %i1)
-    }
+    // irdl.operation @addui_extended {
+    //   %integer = irdl.base "!builtin.integer"
+    //   %i1 = irdl.is i1
+    //   irdl.operands(%integer, %integer)
+    //   irdl.results(%integer, %i1)
+    // }
 
     irdl.operation @andi {
       %i1 = irdl.is i1
@@ -37,20 +37,20 @@ module {
       irdl.results(%integer)
     }
 
-    irdl.operation @bitcast {
-      %integer1 = irdl.base "!builtin.integer"
-      %integer2 = irdl.base "!builtin.integer"
-      %bf16 = irdl.is bf16
-      %f16 = irdl.is f16
-      %f32 = irdl.is f32
-      %f64 = irdl.is f64
-      %f80 = irdl.is f80
-      %f128 = irdl.is f128
-      %input = irdl.any_of(%integer1, %bf16, %f16, %f32, %f64, %f80, %f128)
-      %output = irdl.any_of(%integer2, %bf16, %f16, %f32, %f64, %f80, %f128)
-      irdl.operands(%input)
-      irdl.results(%output)
-    }
+    // irdl.operation @bitcast {
+    //   %integer1 = irdl.base "!builtin.integer"
+    //   %integer2 = irdl.base "!builtin.integer"
+    //   %bf16 = irdl.is bf16
+    //   %f16 = irdl.is f16
+    //   %f32 = irdl.is f32
+    //   %f64 = irdl.is f64
+    //   %f80 = irdl.is f80
+    //   %f128 = irdl.is f128
+    //   %input = irdl.any_of(%integer1, %bf16, %f16, %f32, %f64, %f80, %f128)
+    //   %output = irdl.any_of(%integer2, %bf16, %f16, %f32, %f64, %f80, %f128)
+    //   irdl.operands(%input)
+    //   irdl.results(%output)
+    // }
  
     irdl.operation @ceildivsi {
       %integer = irdl.base "!builtin.integer"
@@ -269,11 +269,11 @@ module {
       irdl.results(%integer)
     }
 
-    irdl.operation @mului_extended {
-      %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer, %integer)
-    }
+    // irdl.operation @mului_extended {
+    //   %integer = irdl.base "!builtin.integer"
+    //   irdl.operands(%integer, %integer)
+    //   irdl.results(%integer, %integer)
+    // }
 
     irdl.operation @negf {
       %bf16 = irdl.is bf16
