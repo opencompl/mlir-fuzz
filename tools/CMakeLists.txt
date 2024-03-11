@@ -1,0 +1,2 @@
+add_subdirectory(arith-superoptimizer)
+add_subdirectory(mlir-enumerate)

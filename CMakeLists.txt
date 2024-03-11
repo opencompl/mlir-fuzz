@@ -36,8 +36,8 @@ include(HandleLLVMOptions)
 include_directories(
                     ${LLVM_INCLUDE_DIRS}
                     ${MLIR_INCLUDE_DIRS}
-                    ${PROJECT_SOURCE_DIR}/mlir-enumerate
                     ${PROJECT_SOURCE_DIR}/guided-tree-search/include
+                    include/
 )
 include_directories("include")
 
@@ -45,4 +45,4 @@ link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(lib)
-add_subdirectory(mlir-enumerate)
+add_subdirectory(tools)
