@@ -214,7 +214,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
   builder.setInsertionPoint(&moduleBlock, moduleBlock.begin());
 
   // Create an empty function, and set the insertion point in it.
-  auto func = builder.create<func::FuncOp>(unknownLoc, "foo",
+  auto func = builder.create<func::FuncOp>(unknownLoc, "main",
                                            FunctionType::get(&ctx, {}, {}));
   func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
   auto &funcBlock = func.getBody().emplaceBlock();
