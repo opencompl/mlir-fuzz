@@ -6,6 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <vector>
 
 #include "CLITool.h"
@@ -49,6 +52,57 @@ std::vector<Type> availableTypes(MLIRContext &ctx) {
   return {builder.getIntegerType(32)};
 }
 
+bool executeAndSaveModule(mlir::ModuleOp module) {
+  // Create an execution engine
+  auto engine = ExecutionEngine::create(module);
+  if (auto error = engine.takeError()) {
+    llvm::errs() << "Failed to create an execution engine for \n";
+    module->print(llvm::errs());
+    llvm::errs() << error;
+
+    return false;
+  }
+
+  auto func = module.lookupSymbol<mlir::LLVM::LLVMFuncOp>("main");
+
+  // We handle up to 3 arguments
+  int32_t inputs[3] = {7, 13, 37};
+  std::vector<void *> args;
+  if (func.getNumArguments() >= 1) {
+    args.push_back(&inputs[0]);
+  }
+  if (func.getNumArguments() >= 2) {
+    args.push_back(&inputs[1]);
+  }
+  if (func.getNumArguments() >= 3) {
+    args.push_back(&inputs[2]);
+  }
+  if (func.getNumArguments() > 3) {
+    return false;
+  }
+  int32_t result;
+  args.push_back(&result);
+
+  pid_t c_pid = fork(); // fork a child process
+
+  // The child process run the program, and save it
+  if (c_pid == 0) {
+    auto invokationError = engine->get()->invokePacked("main", args);
+    if (invokationError) {
+      llvm::errs() << "Failed to invoke the main function for ";
+      module->print(llvm::errs());
+      exit(1);
+    }
+    exit(0);
+  }
+
+  // The current process waits for the child process to finish,
+  // and just checks that the program did not crash.
+  int status;
+  waitpid(c_pid, &status, 0);
+  return status == 0;
+}
+
 int main(int argc, char **argv) {
 
   // The IRDL file containing the dialects that we want to generate
@@ -88,6 +142,7 @@ int main(int argc, char **argv) {
 
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
+  size_t executedProgramCounter = 0;
 
   std::random_device rd;
   std::uniform_int_distribution<int> dist(0, 1 << 30);
@@ -118,37 +173,22 @@ int main(int argc, char **argv) {
     }
     correctProgramCounter += 1;
 
+    // Convert the module to LLVM IR
     if (convertModuleToLLVM(module.get()).failed()) {
       llvm::errs() << "Failed to convert the module to LLVM IR\n";
       module->print(llvm::errs());
       continue;
     }
-    llvm::outs() << "Converted module to LLVM IR\n";
-    module->print(llvm::outs());
 
-    auto engine = ExecutionEngine::create(module.get());
-    if (auto error = engine.takeError()) {
-      llvm::errs() << "Failed to create an execution engine for \n";
-      module->print(llvm::errs());
-      llvm::errs() << error;
-
-      continue;
+    if (executeAndSaveModule(module.get())) {
+      executedProgramCounter += 1;
     }
 
-    llvm::errs() << "Running the main function for ";
-
-    int32_t input = 42;
-    int32_t result = 0;
-    std::vector<void *> args;
-    args.push_back(&input);
-    args.push_back(&result);
-    auto invokationError = engine->get()->invokePacked("main", args);
-    if (invokationError) {
-      llvm::errs() << "Failed to invoke the main function for ";
-      module->print(llvm::errs());
-      continue;
+    if (correctProgramCounter % 100 == 0) {
+      llvm::outs() << "Generated " << programCounter << " programs, "
+                   << correctProgramCounter << " of which verify, "
+                   << executedProgramCounter
+                   << " of which were executed without any bugs.\n";
     }
-
-    llvm::errs() << "Result: " << result << "\n";
   }
 }

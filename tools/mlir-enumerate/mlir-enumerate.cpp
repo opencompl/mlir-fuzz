@@ -83,7 +83,12 @@ int main(int argc, char **argv) {
     }
     correctProgramCounter += 1;
 
-    // Print the program to stdout.
-    module->print(llvm::outs());
+    if (correctProgramCounter % 1000 == 0) {
+      // Print the program to stdout.
+      module->print(llvm::outs());
+    }
   }
+
+  llvm::outs() << "Generated " << programCounter << " programs, "
+               << correctProgramCounter << " of which verify.\n";
 }
