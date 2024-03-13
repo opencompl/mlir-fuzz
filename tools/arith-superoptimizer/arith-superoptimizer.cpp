@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <filesystem>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -52,7 +53,16 @@ std::vector<Type> availableTypes(MLIRContext &ctx) {
   return {builder.getIntegerType(32)};
 }
 
-bool executeAndSaveModule(mlir::ModuleOp module) {
+bool executeAndSaveModule(mlir::ModuleOp module, StringRef outputDirectory) {
+  auto arithModule = module.clone();
+
+  // Convert the module to LLVM IR
+  if (convertModuleToLLVM(module).failed()) {
+    llvm::errs() << "Failed to convert the module to LLVM IR\n";
+    module->print(llvm::errs());
+    return false;
+  }
+
   // Create an execution engine
   auto engine = ExecutionEngine::create(module);
   if (auto error = engine.takeError()) {
@@ -64,43 +74,57 @@ bool executeAndSaveModule(mlir::ModuleOp module) {
   }
 
   auto func = module.lookupSymbol<mlir::LLVM::LLVMFuncOp>("main");
+  auto seed =
+      func->getAttrOfType<mlir::IntegerAttr>("seed").getValue().getSExtValue();
+  int numArguments = func.getNumArguments();
+  assert(numArguments == 1);
 
-  // We handle up to 3 arguments
-  int32_t inputs[3] = {7, 13, 37};
-  std::vector<void *> args;
-  if (func.getNumArguments() >= 1) {
-    args.push_back(&inputs[0]);
-  }
-  if (func.getNumArguments() >= 2) {
-    args.push_back(&inputs[1]);
-  }
-  if (func.getNumArguments() >= 3) {
-    args.push_back(&inputs[2]);
-  }
-  if (func.getNumArguments() > 3) {
-    return false;
-  }
-  int32_t result;
-  args.push_back(&result);
+  std::vector<int32_t> interestingValues = {0, 1, -1, 2, 7, 64};
 
   pid_t c_pid = fork(); // fork a child process
 
   // The child process run the program, and save it
   if (c_pid == 0) {
-    auto invokationError = engine->get()->invokePacked("main", args);
-    if (invokationError) {
-      llvm::errs() << "Failed to invoke the main function for ";
-      module->print(llvm::errs());
+    std::string hashStr;
+    for (int32_t input : interestingValues) {
+      std::vector<void *> args;
+      args.push_back(&input);
+      int32_t result;
+      args.push_back(&result);
+
+      auto invokationError = engine->get()->invokePacked("main", args);
+      if (invokationError) {
+        llvm::errs() << "Failed to invoke the main function for ";
+        module->print(llvm::errs());
+        exit(1);
+      }
+      // use the result to compute the hashStr
+      hashStr = hashStr + "$" + std::to_string(result);
+    }
+    if (outputDirectory.empty())
+      exit(0);
+    // create a new directory with the hash if needed
+    std::string directory = (outputDirectory + "/hash" + hashStr).str();
+    std::filesystem::create_directories(directory);
+    std::string seedStr = std::to_string(seed);
+    std::string filename = directory + "/module" + seedStr + ".mlir";
+    std::error_code error;
+    llvm::raw_fd_ostream file(filename, error);
+    if (error) {
+      llvm::errs() << "Failed to open the file " << filename
+                   << " for writing\n";
       exit(1);
     }
+    arithModule->print(file);
+    file.close();
     exit(0);
+  } else {
+    // The current process waits for the child process to finish,
+    // and just checks that the program did not crash.
+    int status;
+    waitpid(c_pid, &status, 0);
+    return status == 0;
   }
-
-  // The current process waits for the child process to finish,
-  // and just checks that the program did not crash.
-  int status;
-  waitpid(c_pid, &status, 0);
-  return status == 0;
 }
 
 int main(int argc, char **argv) {
@@ -108,6 +132,9 @@ int main(int argc, char **argv) {
   // The IRDL file containing the dialects that we want to generate
   static llvm::cl::opt<std::string> inputFilename(
       llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
+  static llvm::cl::opt<std::string> outputDirectory(
+      "output-directory", llvm::cl::desc("Output directory"),
+      llvm::cl::value_desc("directory"), llvm::cl::init(""));
 
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
@@ -149,7 +176,7 @@ int main(int argc, char **argv) {
 
   auto guide = tree_guide::BFSGuide();
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, availableOps, availableTypes(ctx),
+    auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
                                 getAvailableAttributes(ctx), chooser.get(), 2,
                                 0, correctProgramCounter);
     if (!module)
@@ -173,16 +200,8 @@ int main(int argc, char **argv) {
     }
     correctProgramCounter += 1;
 
-    // Convert the module to LLVM IR
-    if (convertModuleToLLVM(module.get()).failed()) {
-      llvm::errs() << "Failed to convert the module to LLVM IR\n";
-      module->print(llvm::errs());
-      continue;
-    }
-
-    if (executeAndSaveModule(module.get())) {
+    if (executeAndSaveModule(module.get(), outputDirectory))
       executedProgramCounter += 1;
-    }
 
     if (correctProgramCounter % 100 == 0) {
       llvm::outs() << "Generated " << programCounter << " programs, "
@@ -191,4 +210,9 @@ int main(int argc, char **argv) {
                    << " of which were executed without any bugs.\n";
     }
   }
+
+  llvm::outs() << "Generated " << programCounter << " programs, "
+               << correctProgramCounter << " of which verify, "
+               << executedProgramCounter
+               << " of which were executed without any bugs.\n";
 }

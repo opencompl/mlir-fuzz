@@ -21,7 +21,8 @@ static Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
   const std::vector<IntegerAttr> interestingValueList = {
       IntegerAttr::get(type, -1), IntegerAttr::get(type, 0),
       IntegerAttr::get(type, 1)};
-  size_t choice = info.chooser->choose(interestingValueList.size() + 1);
+  // TODO: Add options to generate these.
+  size_t choice = info.chooser->choose(interestingValueList.size());
   IntegerAttr value;
   if (choice == interestingValueList.size()) {
     value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
