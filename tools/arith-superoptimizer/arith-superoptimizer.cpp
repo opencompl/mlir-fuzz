@@ -79,7 +79,7 @@ bool executeAndSaveModule(mlir::ModuleOp module, StringRef outputDirectory) {
   int numArguments = func.getNumArguments();
   assert(numArguments == 1);
 
-  std::vector<int32_t> interestingValues = {0, 1, -1, 2, 7, 64};
+  std::vector<int32_t> interestingValues = {0, 1, -1, 2, 7, -12, 64, 1235987};
 
   pid_t c_pid = fork(); // fork a child process
 
@@ -99,7 +99,7 @@ bool executeAndSaveModule(mlir::ModuleOp module, StringRef outputDirectory) {
         exit(1);
       }
       // use the result to compute the hashStr
-      hashStr = hashStr + "$" + std::to_string(result);
+      hashStr = hashStr + "_" + std::to_string(result);
     }
     if (outputDirectory.empty())
       exit(0);
