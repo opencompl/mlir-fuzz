@@ -32,6 +32,13 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<std::string> inputFilename(
       llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
 
+  // Expect a new line before printing the next program.
+  static llvm::cl::opt<bool> pauseBetweenPrograms(
+      "pause-between-programs",
+      llvm::cl::desc(
+          "Expect a new line in stdin before printing the next program."),
+      llvm::cl::init(false));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -83,9 +90,15 @@ int main(int argc, char **argv) {
     }
     correctProgramCounter += 1;
 
-    if (correctProgramCounter % 1000 == 0) {
-      // Print the program to stdout.
-      module->print(llvm::outs());
+    // Print the program to stdout.
+    module->print(llvm::outs());
+    llvm::outs().flush();
+
+    if (pauseBetweenPrograms) {
+      char c;
+      std::cin >> c;
+      if (c == 'q')
+        break;
     }
   }
 
