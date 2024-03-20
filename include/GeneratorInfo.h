@@ -64,13 +64,17 @@ struct GeneratorInfo {
   /// need to remove elements from this set.
   llvm::DenseMap<mlir::Type, std::vector<mlir::Value>> dominatingValues;
 
+  /// The maximum number of arguments per function:
+  int maxNumArgs;
+
   GeneratorInfo(tree_guide::Chooser *chooser, mlir::OpBuilder builder,
                 mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
                 mlir::ArrayRef<mlir::Type> availableTypes,
-                mlir::ArrayRef<mlir::Attribute> availableAttributes)
+                mlir::ArrayRef<mlir::Attribute> availableAttributes,
+                int maxNumArgs)
       : chooser(chooser), builder(builder), availableOps(availableOps),
         availableTypes(availableTypes),
-        availableAttributes(availableAttributes) {}
+        availableAttributes(availableAttributes), maxNumArgs(maxNumArgs) {}
 
   /// Add a value to the list of available values.
   void addDominatingValue(mlir::Value value) {
@@ -113,8 +117,7 @@ struct GeneratorInfo {
   /// Add an operation with a given result type.
   /// Return the result that has has the requested type.
   /// This function will also create a number proportional to `fuel` operations.
-  std::optional<mlir::Value> addRootedOperation(mlir::Type resultType,
-                                                int fuel);
+  mlir::Value addRootedOperation(mlir::Type resultType, int fuel);
 };
 
 #endif // MLIR_FUZZ_GENERATOR_INFO_H

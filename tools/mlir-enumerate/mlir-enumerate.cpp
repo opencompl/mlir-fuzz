@@ -36,8 +36,20 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<bool> pauseBetweenPrograms(
       "pause-between-programs",
       llvm::cl::desc(
-          "Expect a new line in stdin before printing the next program."),
+          "Expect a new line in stdin before printing the next program"),
       llvm::cl::init(false));
+
+  // Number of non-constant operations to be printed.
+  static llvm::cl::opt<int> maxNumOps(
+      "max-num-ops",
+      llvm::cl::desc("Maximum number of non-constant operations"),
+      llvm::cl::init(3));
+
+  // Maximum number of arguments to be added per function.
+  static llvm::cl::opt<int> maxNumArgs(
+      "max-num-args",
+      llvm::cl::desc("Maximum number of arguments per function"),
+      llvm::cl::init(3));
 
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
@@ -70,13 +82,12 @@ int main(int argc, char **argv) {
   std::random_device rd;
   std::uniform_int_distribution<int> dist(0, 1 << 30);
 
-  auto guide = tree_guide::BFSGuide();
+  auto guide = tree_guide::DefaultGuide();
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
-                                getAvailableAttributes(ctx), chooser.get(), 3,
-                                0, correctProgramCounter);
-    if (!module)
-      continue;
+                                getAvailableAttributes(ctx), chooser.get(),
+                                maxNumOps, maxNumArgs, correctProgramCounter);
+
     programCounter += 1;
     // Some programs still won't verify, because IRDL is not expressive enough
     // to represent all constraints.

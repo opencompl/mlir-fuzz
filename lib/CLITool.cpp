@@ -9,7 +9,7 @@ using namespace mlir;
 
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getIntegerType(32)};
+  return {builder.getIntegerType(1), builder.getIntegerType(32)};
 }
 
 std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx) {

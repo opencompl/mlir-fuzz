@@ -38,9 +38,8 @@ static Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
 std::optional<Value> GeneratorInfo::createValueOutOfThinAir(Type type) {
   auto func = llvm::cast<mlir::func::FuncOp>(
       *builder.getInsertionBlock()->getParentOp());
-  // We don't add more than two arguments for now.
-  // TODO: Make this a proper parameter / CLI argument.
-  if (func.getNumArguments() < 2 && chooser->choose(2) == 0)
+  if (func.getNumArguments() < (unsigned int)maxNumArgs &&
+      chooser->choose(2) == 0)
     return addFunctionArgument(type);
 
   if (auto intType = type.dyn_cast<IntegerType>())
@@ -82,20 +81,41 @@ GeneratorInfo::getOperationsWithResultType(Type resultType) {
   return res;
 }
 
+static Value getZeroCostValue(GeneratorInfo &info, Type type) {
+  auto &domValues = info.dominatingValues[type];
+  bool canUseDominatedValue = domValues.size();
+
+  if (canUseDominatedValue && info.chooser->choose(2) == 0) {
+    auto value = info.getValue(type);
+    assert(value && "Error in generator logic");
+    return *value;
+  }
+
+  auto thinAirValue = info.createValueOutOfThinAir(type);
+  if (thinAirValue.has_value())
+    return *thinAirValue;
+  return info.addFunctionArgument(type);
+}
+
 /// Add an operation with a given result type.
 /// Return the result that has has the requested type.
 /// This function will also create a number of operations less than `fuel`
 /// operations.
-std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
-                                                       int fuel) {
+Value GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
   auto ctx = builder.getContext();
+
+  // When we don't have fuel anymore, we either use a dominated value,
+  // or we create a value out of thin air, which may include adding
+  // a new function argument.
+  if (fuel == 0)
+    return getZeroCostValue(*this, resultType);
 
   // Cost of the current operation being created.
   fuel -= 1;
 
   auto operations = getOperationsWithResultType(resultType);
   if (operations.empty())
-    return {};
+    return getZeroCostValue(*this, resultType);
 
   auto [op, possibleResults] = operations[chooser->choose(operations.size())];
   size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];
@@ -115,8 +135,7 @@ std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
   for (auto operand : getOperandsConstraints(op)) {
     auto satisfyingTypes =
         getSatisfyingTypes(*ctx, valueToIdx[operand], verifier, availableTypes);
-    if (satisfyingTypes.size() == 0)
-      return {};
+    assert(satisfyingTypes.size() != 0 && "No satisfying types for operation");
 
     auto type = satisfyingTypes[chooser->choose(satisfyingTypes.size())];
     auto succeeded =
@@ -126,29 +145,7 @@ std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
     int operandFuel = chooser->choose(fuel + 1);
     fuel -= operandFuel;
 
-    if (operandFuel == 0) {
-      auto argument = getValue(type);
-      if (argument) {
-        operands.push_back(*argument);
-        continue;
-      }
-      auto thinAirValue = createValueOutOfThinAir(type);
-      if (thinAirValue) {
-        operands.push_back(*thinAirValue);
-        continue;
-      }
-
-      operands.push_back(addFunctionArgument(type));
-      continue;
-    }
-
-    auto val = addRootedOperation(type, operandFuel);
-    if (!val) {
-      operands.push_back(addFunctionArgument(type));
-      continue;
-    }
-
-    operands.push_back(*val);
+    operands.push_back(addRootedOperation(type, operandFuel));
   }
 
   std::vector<Type> resultTypes;
@@ -223,20 +220,12 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
 
   // Create the generator info
   GeneratorInfo info(chooser, builder, availableOps, availableTypes,
-                     availableAttributes);
-
-  // Add function arguments
-  for (int i = 0; i < numArgs; i++) {
-    auto type = availableTypes[chooser->choose(availableTypes.size())];
-    info.addFunctionArgument(type);
-  }
+                     availableAttributes, numArgs);
 
   auto type = availableTypes[chooser->choose(availableTypes.size())];
   auto root = info.addRootedOperation(type, numOps);
-  if (!root)
-    return {};
-  builder.create<func::ReturnOp>(unknownLoc, *root);
-  func.insertResult(0, root->getType(), {});
+  builder.create<func::ReturnOp>(unknownLoc, root);
+  func.insertResult(0, root.getType(), {});
 
   return module;
 }
