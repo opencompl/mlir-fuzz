@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   std::random_device rd;
   std::uniform_int_distribution<int> dist(0, 1 << 30);
 
-  auto guide = tree_guide::DefaultGuide();
+  auto guide = tree_guide::BFSGuide();
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
                                 getAvailableAttributes(ctx), chooser.get(),
