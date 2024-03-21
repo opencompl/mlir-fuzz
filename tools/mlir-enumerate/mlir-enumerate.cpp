@@ -103,6 +103,7 @@ int main(int argc, char **argv) {
 
     // Print the program to stdout.
     module->print(llvm::outs());
+    llvm::outs() << "// -----\n";
     llvm::outs().flush();
 
     if (pauseBetweenPrograms) {
