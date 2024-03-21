@@ -51,11 +51,20 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Maximum number of arguments per function"),
       llvm::cl::init(3));
 
+  static llvm::cl::opt<bool> printOpGeneric(
+      "mlir-print-op-generic",
+      llvm::cl::desc("Print the generic form of the operations"),
+      llvm::cl::init(false));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
   MLIRContext ctx;
   ctx.allowUnregisteredDialects();
+
+  // Printing flags
+  OpPrintingFlags printingFlags;
+  printingFlags.printGenericOpForm(printOpGeneric);
 
   // Register all dialects
   DialectRegistry registry;
@@ -102,7 +111,7 @@ int main(int argc, char **argv) {
     correctProgramCounter += 1;
 
     // Print the program to stdout.
-    module->print(llvm::outs());
+    module->print(llvm::outs(), printingFlags);
     llvm::outs() << "// -----\n";
     llvm::outs().flush();
 
