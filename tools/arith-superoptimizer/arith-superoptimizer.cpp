@@ -103,6 +103,11 @@ bool executeAndSaveModule(mlir::ModuleOp module, StringRef outputDirectory) {
     }
     if (outputDirectory.empty())
       exit(0);
+
+    // Printing flags
+    OpPrintingFlags printingFlags;
+    printingFlags.printGenericOpForm(true);
+
     // create a new directory with the hash if needed
     std::string directory = (outputDirectory + "/hash" + hashStr).str();
     std::filesystem::create_directories(directory);
@@ -115,7 +120,7 @@ bool executeAndSaveModule(mlir::ModuleOp module, StringRef outputDirectory) {
                    << " for writing\n";
       exit(1);
     }
-    arithModule->print(file);
+    arithModule->print(file, printingFlags);
     file.close();
     exit(0);
   } else {
@@ -176,9 +181,9 @@ int main(int argc, char **argv) {
 
   auto guide = tree_guide::BFSGuide();
   while (auto chooser = guide.makeChooser()) {
-    auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
+    auto module = createProgram(ctx, availableOps, availableTypes(ctx),
                                 getAvailableAttributes(ctx), chooser.get(), 2,
-                                0, correctProgramCounter);
+                                1, correctProgramCounter);
     if (!module)
       continue;
 
@@ -203,7 +208,7 @@ int main(int argc, char **argv) {
     if (executeAndSaveModule(module.get(), outputDirectory))
       executedProgramCounter += 1;
 
-    if (correctProgramCounter % 100 == 0) {
+    if (correctProgramCounter % 10 == 0) {
       llvm::outs() << "Generated " << programCounter << " programs, "
                    << correctProgramCounter << " of which verify, "
                    << executedProgramCounter
