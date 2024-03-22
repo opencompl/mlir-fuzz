@@ -101,7 +101,8 @@ static Value getZeroCostValue(GeneratorInfo &info, Type type) {
 /// Return the result that has has the requested type.
 /// This function will also create a number of operations less than `fuel`
 /// operations.
-Value GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
+std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
+                                                       int fuel) {
   auto ctx = builder.getContext();
 
   // When we don't have fuel anymore, we either use a dominated value,
@@ -135,7 +136,8 @@ Value GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
   for (auto operand : getOperandsConstraints(op)) {
     auto satisfyingTypes =
         getSatisfyingTypes(*ctx, valueToIdx[operand], verifier, availableTypes);
-    assert(satisfyingTypes.size() != 0 && "No satisfying types for operation");
+    if (satisfyingTypes.empty())
+      return {};
 
     auto type = satisfyingTypes[chooser->choose(satisfyingTypes.size())];
     auto succeeded =
@@ -145,7 +147,10 @@ Value GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
     int operandFuel = chooser->choose(fuel + 1);
     fuel -= operandFuel;
 
-    operands.push_back(addRootedOperation(type, operandFuel));
+    auto operandValue = addRootedOperation(type, operandFuel);
+    if (!operandValue.has_value())
+      return {};
+    operands.push_back(*operandValue);
   }
 
   std::vector<Type> resultTypes;
@@ -224,8 +229,10 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
 
   auto type = availableTypes[chooser->choose(availableTypes.size())];
   auto root = info.addRootedOperation(type, numOps);
-  builder.create<func::ReturnOp>(unknownLoc, root);
-  func.insertResult(0, root.getType(), {});
+  if (!root.has_value())
+    return nullptr;
+  builder.create<func::ReturnOp>(unknownLoc, *root);
+  func.insertResult(0, root->getType(), {});
 
   return module;
 }

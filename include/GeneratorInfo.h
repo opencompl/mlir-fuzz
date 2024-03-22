@@ -117,7 +117,8 @@ struct GeneratorInfo {
   /// Add an operation with a given result type.
   /// Return the result that has has the requested type.
   /// This function will also create a number proportional to `fuel` operations.
-  mlir::Value addRootedOperation(mlir::Type resultType, int fuel);
+  std::optional<mlir::Value> addRootedOperation(mlir::Type resultType,
+                                                int fuel);
 };
 
 #endif // MLIR_FUZZ_GENERATOR_INFO_H
