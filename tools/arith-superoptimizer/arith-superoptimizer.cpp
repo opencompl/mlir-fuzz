@@ -141,6 +141,12 @@ int main(int argc, char **argv) {
       "output-directory", llvm::cl::desc("Output directory"),
       llvm::cl::value_desc("directory"), llvm::cl::init(""));
 
+  // Number of non-constant operations to be printed.
+  static llvm::cl::opt<int> maxNumOps(
+      "max-num-ops",
+      llvm::cl::desc("Maximum number of non-constant operations"),
+      llvm::cl::init(2));
+
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
@@ -182,8 +188,8 @@ int main(int argc, char **argv) {
   auto guide = tree_guide::BFSGuide();
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgram(ctx, availableOps, availableTypes(ctx),
-                                getAvailableAttributes(ctx), chooser.get(), 2,
-                                1, correctProgramCounter);
+                                getAvailableAttributes(ctx), chooser.get(),
+                                maxNumOps, 1, correctProgramCounter);
     if (!module)
       continue;
 
