@@ -56,6 +56,22 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Print the generic form of the operations"),
       llvm::cl::init(false));
 
+  enum class Strategy { BFS, Random };
+
+  static llvm::cl::opt<Strategy> strategy(
+      "strategy", llvm::cl::desc("Strategy to use for enumeration"),
+      llvm::cl::init(Strategy::BFS),
+      llvm::cl::values(clEnumValN(Strategy::BFS, "bfs", "BFS strategy"),
+                       clEnumValN(Strategy::Random, "random",
+                                  "Random exploration (will not stop "
+                                  "when all programs are generated)")));
+
+  static llvm::cl::opt<int> maxPrograms(
+      "max-programs",
+      llvm::cl::desc(
+          "Maximum number of verified programs to generate, -1 for infinite"),
+      llvm::cl::init(-1));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -88,11 +104,19 @@ int main(int argc, char **argv) {
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
-  std::random_device rd;
-  std::uniform_int_distribution<int> dist(0, 1 << 30);
+  // Create the correct guide depending on the chosen strategy
+  std::function<std::unique_ptr<tree_guide::Chooser>()> makeChooser = nullptr;
+  if (strategy == Strategy::Random) {
+    makeChooser = [guide{std::make_shared<tree_guide::DefaultGuide>()}]() {
+      return guide->makeChooser();
+    };
+  } else if (strategy == Strategy::BFS) {
+    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>()}]() {
+      return guide->makeChooser();
+    };
+  }
 
-  auto guide = tree_guide::BFSGuide();
-  while (auto chooser = guide.makeChooser()) {
+  while (auto chooser = makeChooser()) {
     auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
                                 getAvailableAttributes(ctx), chooser.get(),
                                 maxNumOps, maxNumArgs, correctProgramCounter);
@@ -115,6 +139,9 @@ int main(int argc, char **argv) {
     llvm::outs() << "// -----\n";
     llvm::outs().flush();
 
+    if (maxPrograms != -1 && correctProgramCounter >= (size_t)maxPrograms)
+      break;
+
     if (pauseBetweenPrograms) {
       char c;
       std::cin >> c;
@@ -122,7 +149,4 @@ int main(int argc, char **argv) {
         break;
     }
   }
-
-  llvm::outs() << "Generated " << programCounter << " programs, "
-               << correctProgramCounter << " of which verify.\n";
 }
