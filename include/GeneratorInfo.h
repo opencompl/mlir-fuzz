@@ -17,6 +17,7 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Support/LLVM.h"
@@ -104,6 +105,9 @@ struct GeneratorInfo {
     addDominatingValue(arg);
     return arg;
   }
+
+  /// Create a value of the given type, by materializing a constant.
+  mlir::Value createIntegerValue(mlir::IntegerType type);
 
   /// Create a value of the given type, by materializing a constant.
   std::optional<mlir::Value> createValueOutOfThinAir(mlir::Type type);

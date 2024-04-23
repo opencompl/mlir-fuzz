@@ -16,22 +16,22 @@ using namespace mlir;
 using namespace mlir::irdl;
 
 /// Create a constant of the given integer type.
-static Value createIntegerValue(GeneratorInfo &info, IntegerType type) {
-  auto ctx = info.builder.getContext();
+Value GeneratorInfo::createIntegerValue(IntegerType type) {
+  auto ctx = builder.getContext();
   const std::vector<IntegerAttr> interestingValueList = {
       IntegerAttr::get(type, -1), IntegerAttr::get(type, 0),
       IntegerAttr::get(type, 1)};
   // TODO: Add options to generate these.
-  size_t choice = info.chooser->choose(interestingValueList.size());
+  size_t choice = chooser->choose(interestingValueList.size());
   IntegerAttr value;
   if (choice == interestingValueList.size()) {
-    value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
+    value = IntegerAttr::get(type, chooser->chooseUnimportant());
   } else {
     value = interestingValueList[choice];
   }
   auto typedValue = value.cast<TypedAttr>();
   auto constant =
-      info.builder.create<arith::ConstantOp>(UnknownLoc::get(ctx), typedValue);
+      builder.create<arith::ConstantOp>(UnknownLoc::get(ctx), typedValue);
   return constant.getResult();
 }
 
@@ -43,7 +43,7 @@ std::optional<Value> GeneratorInfo::createValueOutOfThinAir(Type type) {
     return addFunctionArgument(type);
 
   if (auto intType = type.dyn_cast<IntegerType>())
-    return createIntegerValue(*this, intType);
+    return createIntegerValue(intType);
   return {};
 }
 
