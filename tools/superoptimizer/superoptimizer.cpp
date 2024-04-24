@@ -87,9 +87,10 @@ int main(int argc, char **argv) {
 
   auto createValueOutOfThinAir = [&ctx](GeneratorInfo &info,
                                         Type type) -> std::optional<Value> {
-    OperationState state(UnknownLoc::get(&ctx), "smt.synth.constant");
-    info.builder.create(state);
-    return {};
+    OperationState state(UnknownLoc::get(&ctx), "smt.synth.constant", {},
+                         {type});
+    auto op = info.builder.create(state);
+    return op->getResult(0);
   };
 
   while (auto chooser = guide.makeChooser()) {
@@ -97,6 +98,8 @@ int main(int argc, char **argv) {
         createProgram(ctx, availableOps, getAvailableTypes(ctx),
                       getAvailableAttributes(ctx), chooser.get(), maxNumOps, 0,
                       correctProgramCounter, createValueOutOfThinAir);
+    if (!module)
+      continue;
 
     programCounter += 1;
     // Some programs still won't verify, because IRDL is not expressive enough

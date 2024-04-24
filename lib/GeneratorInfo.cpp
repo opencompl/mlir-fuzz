@@ -20,8 +20,7 @@ GeneratorInfo::GeneratorInfo(
     mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
     mlir::ArrayRef<mlir::Type> availableTypes,
     mlir::ArrayRef<mlir::Attribute> availableAttributes, int maxNumArgs,
-    std::function<std::optional<Value>(GeneratorInfo &, Type)>
-        createValueOutOfThinAirFn)
+    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAirFn)
     : chooser(chooser), builder(builder), availableOps(availableOps),
       availableTypes(availableTypes), availableAttributes(availableAttributes),
       maxNumArgs(maxNumArgs),
@@ -96,7 +95,7 @@ GeneratorInfo::getOperationsWithResultType(Type resultType) {
   return res;
 }
 
-static Value getZeroCostValue(GeneratorInfo &info, Type type) {
+static std::optional<Value> getZeroCostValue(GeneratorInfo &info, Type type) {
   auto &domValues = info.dominatingValues[type];
   bool canUseDominatedValue = domValues.size();
 
@@ -106,10 +105,7 @@ static Value getZeroCostValue(GeneratorInfo &info, Type type) {
     return *value;
   }
 
-  auto thinAirValue = info.createValueOutOfThinAir(info, type);
-  if (thinAirValue.has_value())
-    return *thinAirValue;
-  return info.addFunctionArgument(type);
+  return info.createValueOutOfThinAir(info, type);
 }
 
 /// Add an operation with a given result type.
