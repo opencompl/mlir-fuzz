@@ -68,14 +68,17 @@ struct GeneratorInfo {
   /// The maximum number of arguments per function:
   int maxNumArgs;
 
+  /// Create a value from no other value.
+  /// For instance, create a constant operation, or create a function argument.
+  std::function<std::optional<mlir::Value>(GeneratorInfo &info,
+                                           mlir::Type type)>
+      createValueOutOfThinAir;
+
   GeneratorInfo(tree_guide::Chooser *chooser, mlir::OpBuilder builder,
                 mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
                 mlir::ArrayRef<mlir::Type> availableTypes,
                 mlir::ArrayRef<mlir::Attribute> availableAttributes,
-                int maxNumArgs)
-      : chooser(chooser), builder(builder), availableOps(availableOps),
-        availableTypes(availableTypes),
-        availableAttributes(availableAttributes), maxNumArgs(maxNumArgs) {}
+                int maxNumArgs);
 
   /// Add a value to the list of available values.
   void addDominatingValue(mlir::Value value) {
@@ -108,9 +111,6 @@ struct GeneratorInfo {
 
   /// Create a value of the given type, by materializing a constant.
   mlir::Value createIntegerValue(mlir::IntegerType type);
-
-  /// Create a value of the given type, by materializing a constant.
-  std::optional<mlir::Value> createValueOutOfThinAir(mlir::Type type);
 
   /// Return the list of operations that can have a particular result type as
   /// result.

@@ -15,6 +15,28 @@
 using namespace mlir;
 using namespace mlir::irdl;
 
+GeneratorInfo::GeneratorInfo(
+    tree_guide::Chooser *chooser, mlir::OpBuilder builder,
+    mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+    mlir::ArrayRef<mlir::Type> availableTypes,
+    mlir::ArrayRef<mlir::Attribute> availableAttributes, int maxNumArgs)
+    : chooser(chooser), builder(builder), availableOps(availableOps),
+      availableTypes(availableTypes), availableAttributes(availableAttributes),
+      maxNumArgs(maxNumArgs) {
+  createValueOutOfThinAir = [](GeneratorInfo &info,
+                               Type type) -> std::optional<Value> {
+    auto func = llvm::cast<mlir::func::FuncOp>(
+        *info.builder.getInsertionBlock()->getParentOp());
+    if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
+        info.chooser->choose(2) == 0)
+      return info.addFunctionArgument(type);
+
+    if (auto intType = type.dyn_cast<IntegerType>())
+      return info.createIntegerValue(intType);
+    return {};
+  };
+}
+
 /// Create a constant of the given integer type.
 Value GeneratorInfo::createIntegerValue(IntegerType type) {
   auto ctx = builder.getContext();
@@ -33,18 +55,6 @@ Value GeneratorInfo::createIntegerValue(IntegerType type) {
   auto constant =
       builder.create<arith::ConstantOp>(UnknownLoc::get(ctx), typedValue);
   return constant.getResult();
-}
-
-std::optional<Value> GeneratorInfo::createValueOutOfThinAir(Type type) {
-  auto func = llvm::cast<mlir::func::FuncOp>(
-      *builder.getInsertionBlock()->getParentOp());
-  if (func.getNumArguments() < (unsigned int)maxNumArgs &&
-      chooser->choose(2) == 0)
-    return addFunctionArgument(type);
-
-  if (auto intType = type.dyn_cast<IntegerType>())
-    return createIntegerValue(intType);
-  return {};
 }
 
 /// Return the list of operations that can have a particular result type as
@@ -91,7 +101,7 @@ static Value getZeroCostValue(GeneratorInfo &info, Type type) {
     return *value;
   }
 
-  auto thinAirValue = info.createValueOutOfThinAir(type);
+  auto thinAirValue = info.createValueOutOfThinAir(info, type);
   if (thinAirValue.has_value())
     return *thinAirValue;
   return info.addFunctionArgument(type);
