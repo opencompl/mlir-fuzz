@@ -19,22 +19,27 @@ GeneratorInfo::GeneratorInfo(
     tree_guide::Chooser *chooser, mlir::OpBuilder builder,
     mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
     mlir::ArrayRef<mlir::Type> availableTypes,
-    mlir::ArrayRef<mlir::Attribute> availableAttributes, int maxNumArgs)
+    mlir::ArrayRef<mlir::Attribute> availableAttributes, int maxNumArgs,
+    std::function<std::optional<Value>(GeneratorInfo &, Type)>
+        createValueOutOfThinAirFn)
     : chooser(chooser), builder(builder), availableOps(availableOps),
       availableTypes(availableTypes), availableAttributes(availableAttributes),
-      maxNumArgs(maxNumArgs) {
-  createValueOutOfThinAir = [](GeneratorInfo &info,
-                               Type type) -> std::optional<Value> {
-    auto func = llvm::cast<mlir::func::FuncOp>(
-        *info.builder.getInsertionBlock()->getParentOp());
-    if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
-        info.chooser->choose(2) == 0)
-      return info.addFunctionArgument(type);
+      maxNumArgs(maxNumArgs),
+      createValueOutOfThinAir(createValueOutOfThinAirFn) {
+  if (!createValueOutOfThinAir) {
+    createValueOutOfThinAir = [](GeneratorInfo &info,
+                                 Type type) -> std::optional<Value> {
+      auto func = llvm::cast<mlir::func::FuncOp>(
+          *info.builder.getInsertionBlock()->getParentOp());
+      if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
+          info.chooser->choose(2) == 0)
+        return info.addFunctionArgument(type);
 
-    if (auto intType = type.dyn_cast<IntegerType>())
-      return info.createIntegerValue(intType);
-    return {};
-  };
+      if (auto intType = type.dyn_cast<IntegerType>())
+        return info.createIntegerValue(intType);
+      return {};
+    };
+  }
 }
 
 /// Create a constant of the given integer type.

@@ -74,11 +74,13 @@ struct GeneratorInfo {
                                            mlir::Type type)>
       createValueOutOfThinAir;
 
-  GeneratorInfo(tree_guide::Chooser *chooser, mlir::OpBuilder builder,
-                mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
-                mlir::ArrayRef<mlir::Type> availableTypes,
-                mlir::ArrayRef<mlir::Attribute> availableAttributes,
-                int maxNumArgs);
+  GeneratorInfo(
+      tree_guide::Chooser *chooser, mlir::OpBuilder builder,
+      mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+      mlir::ArrayRef<mlir::Type> availableTypes,
+      mlir::ArrayRef<mlir::Attribute> availableAttributes, int maxNumArgs,
+      std::function<std::optional<mlir::Value>(GeneratorInfo &, mlir::Type)>
+          createValueOutOfThinAir = nullptr);
 
   /// Add a value to the list of available values.
   void addDominatingValue(mlir::Value value) {
