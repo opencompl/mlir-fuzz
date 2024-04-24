@@ -216,12 +216,11 @@ std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
 
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
-OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
-                                    ArrayRef<OperationOp> availableOps,
-                                    ArrayRef<Type> availableTypes,
-                                    ArrayRef<Attribute> availableAttributes,
-                                    tree_guide::Chooser *chooser, int numOps,
-                                    int numArgs, int seed) {
+OwningOpRef<ModuleOp> createProgram(
+    MLIRContext &ctx, ArrayRef<OperationOp> availableOps,
+    ArrayRef<Type> availableTypes, ArrayRef<Attribute> availableAttributes,
+    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
+    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -240,7 +239,7 @@ OwningOpRef<ModuleOp> createProgram(MLIRContext &ctx,
 
   // Create the generator info
   GeneratorInfo info(chooser, builder, availableOps, availableTypes,
-                     availableAttributes, numArgs);
+                     availableAttributes, numArgs, createValueOutOfThinAir);
 
   auto type = availableTypes[chooser->choose(availableTypes.size())];
   auto root = info.addRootedOperation(type, numOps);

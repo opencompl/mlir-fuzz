@@ -5,9 +5,9 @@ set(LLVM_LINK_COMPONENTS
   native
   )
 
-add_llvm_executable(arith-superoptimizer arith-superoptimizer.cpp)
+add_llvm_executable(superoptimizer superoptimizer.cpp)
 
-target_link_libraries(arith-superoptimizer
+target_link_libraries(superoptimizer
   PRIVATE
   MLIRFuzzLib
   MLIRExecutionEngine
@@ -18,6 +18,6 @@ target_link_libraries(arith-superoptimizer
   MLIRTargetLLVMIRExport
 )
 
-llvm_update_compile_flags(arith-superoptimizer)
+llvm_update_compile_flags(superoptimizer)
 
-mlir_check_all_link_libraries(arith-superoptimizer)
+mlir_check_all_link_libraries(superoptimizer)

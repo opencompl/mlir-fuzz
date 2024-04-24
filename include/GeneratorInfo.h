@@ -30,15 +30,6 @@ namespace mlir {
 class ModuleOp;
 }
 
-/// Create a random program, given the decisions taken from chooser.
-/// The program has at most `fuel` operations.
-mlir::OwningOpRef<mlir::ModuleOp>
-createProgram(mlir::MLIRContext &ctx,
-              mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
-              mlir::ArrayRef<mlir::Type> availableTypes,
-              mlir::ArrayRef<mlir::Attribute> availableAttributes,
-              tree_guide::Chooser *chooser, int numOps, int numArgs, int seed);
-
 /// Data structure to hold some information about the current program
 /// being generated.
 struct GeneratorInfo {
@@ -68,19 +59,19 @@ struct GeneratorInfo {
   /// The maximum number of arguments per function:
   int maxNumArgs;
 
+  using CreateValueOutOfThinAirFn =
+      std::function<std::optional<mlir::Value>(GeneratorInfo &, mlir::Type)>;
+
   /// Create a value from no other value.
   /// For instance, create a constant operation, or create a function argument.
-  std::function<std::optional<mlir::Value>(GeneratorInfo &info,
-                                           mlir::Type type)>
-      createValueOutOfThinAir;
+  CreateValueOutOfThinAirFn createValueOutOfThinAir;
 
-  GeneratorInfo(
-      tree_guide::Chooser *chooser, mlir::OpBuilder builder,
-      mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
-      mlir::ArrayRef<mlir::Type> availableTypes,
-      mlir::ArrayRef<mlir::Attribute> availableAttributes, int maxNumArgs,
-      std::function<std::optional<mlir::Value>(GeneratorInfo &, mlir::Type)>
-          createValueOutOfThinAir = nullptr);
+  GeneratorInfo(tree_guide::Chooser *chooser, mlir::OpBuilder builder,
+                mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+                mlir::ArrayRef<mlir::Type> availableTypes,
+                mlir::ArrayRef<mlir::Attribute> availableAttributes,
+                int maxNumArgs,
+                CreateValueOutOfThinAirFn createValueOutOfThinAir = nullptr);
 
   /// Add a value to the list of available values.
   void addDominatingValue(mlir::Value value) {
@@ -126,5 +117,15 @@ struct GeneratorInfo {
   std::optional<mlir::Value> addRootedOperation(mlir::Type resultType,
                                                 int fuel);
 };
+
+/// Create a random program, given the decisions taken from chooser.
+/// The program has at most `fuel` operations.
+mlir::OwningOpRef<mlir::ModuleOp> createProgram(
+    mlir::MLIRContext &ctx,
+    mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+    mlir::ArrayRef<mlir::Type> availableTypes,
+    mlir::ArrayRef<mlir::Attribute> availableAttributes,
+    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
+    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir = nullptr);
 
 #endif // MLIR_FUZZ_GENERATOR_INFO_H
