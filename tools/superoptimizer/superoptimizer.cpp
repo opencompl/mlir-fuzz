@@ -33,7 +33,8 @@ OwningOpRef<ModuleOp> createProgramFromInput(
     ArrayRef<OperationOp> availableOps, ArrayRef<Type> availableTypes,
     ArrayRef<Attribute> availableAttributes, tree_guide::Chooser *chooser,
     int numOps, int seed,
-    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir) {
+    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir,
+    bool useInputOps) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -44,8 +45,17 @@ OwningOpRef<ModuleOp> createProgramFromInput(
   builder.setInsertionPoint(&moduleBlock, moduleBlock.begin());
 
   // Clone the input function
-  auto funcOp = builder.insert(inputFunction.clone());
-  auto func = cast<func::FuncOp>(funcOp);
+  func::FuncOp func;
+  if (useInputOps) {
+    auto funcOp = builder.insert(inputFunction.clone());
+    func = cast<func::FuncOp>(funcOp);
+    func.getBlocks().front().getTerminator()->erase();
+  } else {
+    auto funcOp = builder.insert(inputFunction.cloneWithoutRegions());
+    func = cast<func::FuncOp>(funcOp);
+    func.addEntryBlock();
+  }
+
   func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
 
   // Set the insertion point to it
@@ -62,8 +72,6 @@ OwningOpRef<ModuleOp> createProgramFromInput(
   for (auto &op : func.getOps())
     for (auto result : op.getResults())
       info.addDominatingValue(result);
-
-  func.getBlocks().front().getTerminator()->erase();
 
   auto type = func.getFunctionType().getResult(0);
   auto root = info.addRootedOperation(type, numOps);
@@ -101,6 +109,11 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<bool> printOpGeneric(
       "mlir-print-op-generic",
       llvm::cl::desc("Print the generic form of the operations"),
+      llvm::cl::init(false));
+
+  static llvm::cl::opt<bool> useInputOps(
+      "use-input-ops",
+      llvm::cl::desc("Use the input operations to enumerate programs"),
       llvm::cl::init(false));
 
   llvm::InitLLVM y(argc, argv);
@@ -168,7 +181,7 @@ int main(int argc, char **argv) {
     auto module = createProgramFromInput(
         ctx, inputFunc, availableOps, getAvailableTypes(ctx),
         getAvailableAttributes(ctx), chooser.get(), maxNumOps,
-        correctProgramCounter, createValueOutOfThinAir);
+        correctProgramCounter, createValueOutOfThinAir, useInputOps);
     if (!module)
       continue;
 
