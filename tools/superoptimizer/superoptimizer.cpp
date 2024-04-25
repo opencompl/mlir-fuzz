@@ -26,10 +26,63 @@
 using namespace mlir;
 using namespace irdl;
 
+/// Create a random program, given the decisions taken from chooser.
+/// The program has at most `fuel` operations.
+OwningOpRef<ModuleOp> createProgramFromInput(
+    MLIRContext &ctx, func::FuncOp inputFunction,
+    ArrayRef<OperationOp> availableOps, ArrayRef<Type> availableTypes,
+    ArrayRef<Attribute> availableAttributes, tree_guide::Chooser *chooser,
+    int numOps, int seed,
+    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir) {
+  // Create an empty module.
+  auto unknownLoc = UnknownLoc::get(&ctx);
+  OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
+
+  // Create the builder, and set its insertion point in the module.
+  OpBuilder builder(&ctx);
+  auto &moduleBlock = module->getRegion().getBlocks().front();
+  builder.setInsertionPoint(&moduleBlock, moduleBlock.begin());
+
+  // Clone the input function
+  auto funcOp = builder.insert(inputFunction.clone());
+  auto func = cast<func::FuncOp>(funcOp);
+  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
+
+  // Set the insertion point to it
+  auto &funcBlock = func.getRegion().front();
+  builder.setInsertionPoint(&funcBlock, funcBlock.end());
+
+  // Create the generator info
+  GeneratorInfo info(chooser, builder, availableOps, availableTypes,
+                     availableAttributes, 0, createValueOutOfThinAir);
+
+  // Add all the function values to the dominating values
+  for (auto arg : func.getArguments())
+    info.addDominatingValue(arg);
+  for (auto &op : func.getOps())
+    for (auto result : op.getResults())
+      info.addDominatingValue(result);
+
+  func.getBlocks().front().getTerminator()->erase();
+
+  auto type = func.getFunctionType().getResult(0);
+  auto root = info.addRootedOperation(type, numOps);
+  if (!root.has_value())
+    return nullptr;
+  builder.create<func::ReturnOp>(unknownLoc, *root);
+
+  return module;
+}
+
 int main(int argc, char **argv) {
 
   // The IRDL file containing the dialects that we want to generate
   static llvm::cl::opt<std::string> inputFilename(
+      llvm::cl::Positional, llvm::cl::desc("<input program>"),
+      llvm::cl::init("-"));
+
+  // The IRDL file containing the dialects that we want to generate
+  static llvm::cl::opt<std::string> inputIRDLFilename(
       llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
 
   // Expect a new line before printing the next program.
@@ -66,8 +119,26 @@ int main(int argc, char **argv) {
   ctx.appendDialectRegistry(registry);
   ctx.loadAllAvailableDialects();
 
+  // Parse the input program we want to optimize.
+  auto optInputProgram = parseMLIRFile(ctx, inputFilename);
+  if (!optInputProgram)
+    return 1;
+  auto &inputProgram = optInputProgram.value();
+
+  // Get the unique function from the input program.
+  SmallVector<func::FuncOp, 1> op =
+      llvm::to_vector(inputProgram->getOps<func::FuncOp>());
+  if (op.size() != 1) {
+    llvm::errs() << "Expected exactly one function in the input program\n";
+    return 1;
+  }
+  auto inputFunc = op[0];
+
+  assert(inputFunc.getFunctionType().getNumResults() == 1 &&
+         "Expected exactly one result in the input function");
+
   // Try to parse the dialects.
-  auto optDialects = parseMLIRFile(ctx, inputFilename);
+  auto optDialects = parseMLIRFile(ctx, inputIRDLFilename);
   if (!optDialects)
     return 1;
 
@@ -94,10 +165,10 @@ int main(int argc, char **argv) {
   };
 
   while (auto chooser = guide.makeChooser()) {
-    auto module =
-        createProgram(ctx, availableOps, getAvailableTypes(ctx),
-                      getAvailableAttributes(ctx), chooser.get(), maxNumOps, 0,
-                      correctProgramCounter, createValueOutOfThinAir);
+    auto module = createProgramFromInput(
+        ctx, inputFunc, availableOps, getAvailableTypes(ctx),
+        getAvailableAttributes(ctx), chooser.get(), maxNumOps,
+        correctProgramCounter, createValueOutOfThinAir);
     if (!module)
       continue;
 
