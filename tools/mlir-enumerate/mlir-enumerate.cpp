@@ -72,6 +72,10 @@ int main(int argc, char **argv) {
           "Maximum number of verified programs to generate, -1 for infinite"),
       llvm::cl::init(-1));
 
+  static llvm::cl::opt<bool> noConstants(
+      "no-constants", llvm::cl::desc("Do not generate constants"),
+      llvm::cl::init(false));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -114,25 +118,38 @@ int main(int argc, char **argv) {
     return WalkResult::advance();
   });
 
+  bool noConstantsBool = noConstants;
   auto createValueOutOfThinAir =
-      [constantName](GeneratorInfo &info, Type type) -> std::optional<Value> {
+      [constantName, noConstantsBool](GeneratorInfo &info,
+                                      Type type) -> std::optional<Value> {
     auto *ctx = info.builder.getContext();
     auto func = llvm::cast<mlir::func::FuncOp>(
         *info.builder.getInsertionBlock()->getParentOp());
     if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
-        info.chooser->choose(2) == 0)
+        (noConstantsBool || info.chooser->choose(2) == 0))
       return info.addFunctionArgument(type);
 
-    if (auto intType = type.dyn_cast<IntegerType>()) {
-      auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
+    if (!noConstantsBool && constantName != "") {
+      if (auto intType = type.dyn_cast<IntegerType>()) {
+        auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
 
-      OperationState state(
-          UnknownLoc::get(ctx), constantName, {}, {type},
-          {NamedAttribute(StringAttr::get(ctx, "value"), value)});
-      auto op = info.builder.create(state);
-      return op->getResult(0);
+        OperationState state(
+            UnknownLoc::get(ctx), constantName, {}, {type},
+            {NamedAttribute(StringAttr::get(ctx, "value"), value)});
+        auto op = info.builder.create(state);
+        return op->getResult(0);
+      }
     }
-    return {};
+
+    auto &domValues = info.dominatingValues[type];
+
+    if (domValues.size()) {
+      auto value = info.getValue(type);
+      assert(value && "Error in generator logic");
+      return *value;
+    }
+
+    return info.addFunctionArgument(type);
   };
 
   size_t programCounter = 0;
@@ -157,6 +174,8 @@ int main(int argc, char **argv) {
                                 createValueOutOfThinAir);
 
     programCounter += 1;
+    if (!module)
+      continue;
     // Some programs still won't verify, because IRDL is not expressive enough
     // to represent all constraints.
     {
