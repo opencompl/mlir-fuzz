@@ -101,6 +101,40 @@ int main(int argc, char **argv) {
   dialects->walk(
       [&availableOps](OperationOp op) { availableOps.push_back(op); });
 
+  StringRef constantName = "";
+  dialects->walk([&constantName](DialectOp op) {
+    if (op.getName() == "arith") {
+      constantName = "arith.constant";
+      return WalkResult::interrupt();
+    }
+    if (op.getName() == "comb") {
+      constantName = "hw.constant";
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+
+  auto createValueOutOfThinAir =
+      [constantName](GeneratorInfo &info, Type type) -> std::optional<Value> {
+    auto *ctx = info.builder.getContext();
+    auto func = llvm::cast<mlir::func::FuncOp>(
+        *info.builder.getInsertionBlock()->getParentOp());
+    if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
+        info.chooser->choose(2) == 0)
+      return info.addFunctionArgument(type);
+
+    if (auto intType = type.dyn_cast<IntegerType>()) {
+      auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
+
+      OperationState state(
+          UnknownLoc::get(ctx), constantName, {}, {type},
+          {NamedAttribute(StringAttr::get(ctx, "value"), value)});
+      auto op = info.builder.create(state);
+      return op->getResult(0);
+    }
+    return {};
+  };
+
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
@@ -119,7 +153,8 @@ int main(int argc, char **argv) {
   while (auto chooser = makeChooser()) {
     auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
                                 getAvailableAttributes(ctx), chooser.get(),
-                                maxNumOps, maxNumArgs, correctProgramCounter);
+                                maxNumOps, maxNumArgs, correctProgramCounter,
+                                createValueOutOfThinAir);
 
     programCounter += 1;
     // Some programs still won't verify, because IRDL is not expressive enough
