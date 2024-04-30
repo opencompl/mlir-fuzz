@@ -149,6 +149,13 @@ int main(int argc, char **argv) {
 
   assert(inputFunc.getFunctionType().getNumResults() == 1 &&
          "Expected exactly one result in the input function");
+  int numInputOps = -2; // Do not count the function and the return op.
+  inputFunc.walk([&numInputOps](Operation *op) {
+    if (op->getName().getStringRef() != "arith.constant" &&
+        op->getName().getStringRef() != "hw.constant")
+      numInputOps += 1;
+  });
+  maxNumOps = std::min((int)maxNumOps, numInputOps - 1);
 
   // Try to parse the dialects.
   auto optDialects = parseMLIRFile(ctx, inputIRDLFilename);
