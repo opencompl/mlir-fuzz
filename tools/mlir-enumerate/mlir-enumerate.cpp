@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cmath>
 #include <vector>
 
 #include "CLITool.h"
@@ -52,7 +53,7 @@ int main(int argc, char **argv) {
       llvm::cl::init(3));
 
   static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"),
-                                 llvm::cl::init(0));
+                                 llvm::cl::init(-1));
 
   static llvm::cl::opt<bool> printOpGeneric(
       "mlir-print-op-generic",
@@ -157,6 +158,11 @@ int main(int argc, char **argv) {
 
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
+
+  // we assign a random seed if no seed is given from outside
+  if (seed == -1) {
+    seed = std::abs((int)std::random_device{}());
+  }
 
   // Create the correct guide depending on the chosen strategy
   std::function<std::unique_ptr<tree_guide::Chooser>()> makeChooser = nullptr;
