@@ -51,6 +51,9 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Maximum number of arguments per function"),
       llvm::cl::init(3));
 
+  static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"),
+                                 llvm::cl::init(0));
+
   static llvm::cl::opt<bool> printOpGeneric(
       "mlir-print-op-generic",
       llvm::cl::desc("Print the generic form of the operations"),
@@ -158,20 +161,19 @@ int main(int argc, char **argv) {
   // Create the correct guide depending on the chosen strategy
   std::function<std::unique_ptr<tree_guide::Chooser>()> makeChooser = nullptr;
   if (strategy == Strategy::Random) {
-    makeChooser = [guide{std::make_shared<tree_guide::DefaultGuide>()}]() {
+    makeChooser = [guide{std::make_shared<tree_guide::DefaultGuide>(seed)}]() {
       return guide->makeChooser();
     };
   } else if (strategy == Strategy::BFS) {
-    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>()}]() {
+    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>(seed)}]() {
       return guide->makeChooser();
     };
   }
 
   while (auto chooser = makeChooser()) {
-    auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
-                                getAvailableAttributes(ctx), chooser.get(),
-                                maxNumOps, maxNumArgs, correctProgramCounter,
-                                createValueOutOfThinAir);
+    auto module = createProgram(
+        ctx, availableOps, getAvailableTypes(ctx), getAvailableAttributes(ctx),
+        chooser.get(), maxNumOps, maxNumArgs, seed, createValueOutOfThinAir);
 
     programCounter += 1;
     if (!module)
