@@ -51,10 +51,8 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Maximum number of arguments per function"),
       llvm::cl::init(3));
 
-  static llvm::cl::opt<int> seed(
-            "seed",
-            llvm::cl::desc("Random seed"),
-            llvm::cl::init(0));
+  static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"),
+                                 llvm::cl::init(0));
 
   static llvm::cl::opt<bool> printOpGeneric(
       "mlir-print-op-generic",
@@ -173,10 +171,9 @@ int main(int argc, char **argv) {
   }
 
   while (auto chooser = makeChooser()) {
-    auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
-                                getAvailableAttributes(ctx), chooser.get(),
-                                maxNumOps, maxNumArgs, seed,
-                                createValueOutOfThinAir);
+    auto module = createProgram(
+        ctx, availableOps, getAvailableTypes(ctx), getAvailableAttributes(ctx),
+        chooser.get(), maxNumOps, maxNumArgs, seed, createValueOutOfThinAir);
 
     programCounter += 1;
     if (!module)
