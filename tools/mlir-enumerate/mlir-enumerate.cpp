@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cmath>
 #include <vector>
 
 #include "CLITool.h"
@@ -75,6 +76,10 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<bool> noConstants(
       "no-constants", llvm::cl::desc("Do not generate constants"),
       llvm::cl::init(false));
+
+  static llvm::cl::opt<int> seed(
+      "seed", llvm::cl::desc("Specify random seed used in generation"),
+      llvm::cl::init(-1));
 
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
@@ -155,14 +160,19 @@ int main(int argc, char **argv) {
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
+  // set seed to a random positive integer
+  if (seed == -1) {
+    seed = std::abs((int)std::random_device{}());
+  }
+
   // Create the correct guide depending on the chosen strategy
   std::function<std::unique_ptr<tree_guide::Chooser>()> makeChooser = nullptr;
   if (strategy == Strategy::Random) {
-    makeChooser = [guide{std::make_shared<tree_guide::DefaultGuide>()}]() {
+    makeChooser = [guide{std::make_shared<tree_guide::DefaultGuide>(seed)}]() {
       return guide->makeChooser();
     };
   } else if (strategy == Strategy::BFS) {
-    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>()}]() {
+    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>(seed)}]() {
       return guide->makeChooser();
     };
   }
