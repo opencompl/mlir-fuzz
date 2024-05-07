@@ -95,6 +95,37 @@ GeneratorInfo::getOperationsWithResultType(Type resultType) {
   return res;
 }
 
+/// Return the list of operations that can have a particular result type as
+/// result with a filter.
+/// We only consider operations making filter true.
+/// Returns as well the indices of the results that can have this result type.
+std::vector<std::pair<OperationOp, std::vector<int>>>
+GeneratorInfo::getOperationsWithResultType(
+    Type resultType, std::function<bool(mlir::irdl::OperationOp)> filter) {
+  auto ctx = builder.getContext();
+
+  // Choose one operation that can support the resulting type.
+  // Also get the indices of result definitions that are satisfied by this
+  // type.
+  std::vector<std::pair<OperationOp, std::vector<int>>> res;
+
+  for (auto op : availableOps) {
+    if (!filter(op)) {
+      continue;
+    }
+    std::vector<int> satisfiableResults;
+    for (auto [idx, resultDef] : llvm::enumerate(getResultsConstraints(op))) {
+      if (!getSatisfyingTypes(*ctx, resultDef, op, {resultType}).empty())
+        satisfiableResults.push_back(idx);
+    }
+    if (satisfiableResults.empty())
+      continue;
+    res.push_back({op, satisfiableResults});
+  }
+
+  return res;
+}
+
 static std::optional<Value> getZeroCostValue(GeneratorInfo &info, Type type) {
   auto &domValues = info.dominatingValues[type];
   bool canUseDominatedValue = domValues.size();

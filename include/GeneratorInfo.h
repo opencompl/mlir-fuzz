@@ -14,6 +14,7 @@
 #define MLIR_FUZZ_GENERATOR_INFO_H
 
 #include "guide.h"
+#include <functional>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
@@ -110,6 +111,15 @@ struct GeneratorInfo {
   /// Returns as well the indices of the results that can have this result type.
   std::vector<std::pair<mlir::irdl::OperationOp, std::vector<int>>>
   getOperationsWithResultType(mlir::Type resultType);
+
+  /// Return the list of operations that can have a particular result type as
+  /// result with a filter.
+  /// We only consider operations making filter true.
+  /// Returns as well the indices of the results that can have this result type.
+  std::vector<std::pair<mlir::irdl::OperationOp, std::vector<int>>>
+  getOperationsWithResultType(
+      mlir::Type resultType,
+      std::function<bool(mlir::irdl::OperationOp)> filter);
 
   /// Add an operation with a given result type.
   /// Return the result that has has the requested type.
