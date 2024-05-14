@@ -121,6 +121,13 @@ struct GeneratorInfo {
       mlir::Type resultType,
       std::function<bool(mlir::irdl::OperationOp)> filter);
 
+  /// Create an operation with a given operation op
+  /// Return the operation created
+  /// This function is used inside of addRootedOperation
+  mlir::Operation *createOperation(mlir::irdl::OperationOp op,
+                                   mlir::Type resultType, int resultIdx,
+                                   int fuel);
+
   /// Add an operation with a given result type.
   /// Return the result that has has the requested type.
   /// This function will also create a number proportional to `fuel` operations.
