@@ -127,33 +127,41 @@ GeneratorInfo::getOperationsWithResultType(
   return res;
 }
 
-static std::optional<Value> getZeroCostValue(GeneratorInfo &info, Type type) {
+/// Return the value and an indicator of its index. If the indicator is 0,
+/// this value is created out of air. Otherwise it is the index + 1
+static std::pair<std::optional<Value>, int>
+getZeroCostValue(GeneratorInfo &info, Type type) {
   auto &domValues = info.dominatingValues[type];
   bool canUseDominatedValue = domValues.size();
 
   if (canUseDominatedValue && info.chooser->choose(2) == 0) {
-    auto value = info.getValue(type);
+    auto [value, choice] = info.getValue(type);
     assert(value && "Error in generator logic");
-    return *value;
+    return {*value, choice + 1};
   }
 
-  return info.createValueOutOfThinAir(info, type);
+  return {info.createValueOutOfThinAir(info, type), 0};
 }
 
-static bool isNonZeroCost(mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
-                          mlir::Operation *op) {
-  static std::unordered_set<std::string> opNames;
-  if (opNames.empty()) {
-    assert(!availableOps.empty());
-    auto frontOp = availableOps[0];
-    auto dialectName = frontOp.getParentOp().getName();
-    for (auto op : availableOps) {
-      std::string opName = dialectName.str() + "." + op.getNameAttr().str();
-      opNames.insert(opName);
-    }
-  }
+/// Get a zero cost value with index less than argument. The result
+/// value is either created from air or its index is less than the specified.
+static std::pair<std::optional<Value>, int>
+getZeroCostValueWithIndex(GeneratorInfo &info, Type type, int index) {
+  auto choice = info.chooser->choose(index + 1);
+  if (choice == 0) {
+    return {info.createValueOutOfThinAir(info, type), 0};
+  } else {
+    --choice;
+    // if index is not zero, then valid dom range in info is [0, index-1]
+    // which is a random number in [0, index); thus no need to increase 1 to
+    // index here
+    auto &domValues = info.dominatingValues[type];
 
-  return opNames.find(op->getName().getStringRef().str()) != opNames.end();
+    if (domValues.size() == 0) {
+      return {{}, -1};
+    }
+    return {domValues[choice], choice + 1};
+  }
 }
 
 mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
@@ -174,6 +182,14 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
   assert(succeeded.succeeded());
 
   std::vector<Value> operands;
+  /**
+   * For commutativity, there are three possibilities:
+   * 1. both LHS and RHS are created from operations
+   * 2. only LHS are created from an operation, RHS is a zero-cost value
+   * 3. both LHS and RHS are zero-cost values
+   * As a result, when checking RHS, if we found fuel is zero or LHS is a
+   * zero-cost value, RHS has to be a zero-cost value as well.
+   */
   if (op->hasAttr(COMMUTATIVITY)) {
     auto operandsConstraints = getOperandsConstraints(op);
     int LHSfuel = chooser->choose(fuel + 1), RHSfuel = fuel - LHSfuel;
@@ -188,12 +204,12 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
         [](mlir::irdl::OperationOp op) { return true; };
 
     // LHS can be generated freely
-    auto LHSvalue = addRootedOperation(LHStype, LHSfuel);
+    auto [LHSvalue, LHSIsZeroCost] = addRootedOperation(LHStype, LHSfuel);
     if (!LHSvalue.has_value()) {
       return nullptr;
     }
     if (mlir::Operation *LHSoperation = LHSvalue->getDefiningOp();
-        LHSoperation != nullptr && isNonZeroCost(availableOps, LHSoperation)) {
+        LHSoperation != nullptr && LHSIsZeroCost == -1) {
       std::string LHSopName = LHSoperation->getName().getStringRef().str();
       LHSopName =
           std::string(std::find(LHSopName.begin(), LHSopName.end(), '.') + 1,
@@ -213,9 +229,14 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
     std::optional<Value> RHSvalue;
 
     auto RHSoperations = getOperationsWithResultType(resultType, filter);
-    if (RHSoperations.empty() || RHSfuel == 0)
-      RHSvalue = getZeroCostValue(*this, RHStype);
-    else {
+    if (RHSoperations.empty() || RHSfuel == 0) {
+      if (LHSIsZeroCost != -1) {
+        RHSvalue =
+            getZeroCostValueWithIndex(*this, RHStype, LHSIsZeroCost).first;
+      } else {
+        RHSvalue = getZeroCostValue(*this, RHStype).first;
+      }
+    } else {
       auto [RHSop, possibleResults] =
           RHSoperations[chooser->choose(RHSoperations.size())];
       size_t RHSresultIdx =
@@ -248,7 +269,7 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
       int operandFuel = chooser->choose(fuel + 1);
       fuel -= operandFuel;
 
-      auto operandValue = addRootedOperation(type, operandFuel);
+      auto [operandValue, isZeroCost] = addRootedOperation(type, operandFuel);
       if (!operandValue.has_value())
         return nullptr;
       operands.push_back(*operandValue);
@@ -298,11 +319,13 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
 }
 
 /// Add an operation with a given result type.
-/// Return the result that has has the requested type.
-/// This function will also create a number of operations less than `fuel`
-/// operations.
-std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
-                                                       int fuel) {
+/// Return the result that has has the requested type and an integer indicating
+/// the source of the value. If it is -1, it's a new created operation;
+/// otherwise it uses a dominated value or created from air. The integer is its
+/// index. This function will also create a number of operations less than
+/// `fuel` operations.
+std::pair<std::optional<Value>, int>
+GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
 
   // When we don't have fuel anymore, we either use a dominated value,
   // or we create a value out of thin air, which may include adding
@@ -328,7 +351,7 @@ std::optional<Value> GeneratorInfo::addRootedOperation(Type resultType,
     addDominatingValue(result);
   }
 
-  return operation->getResult(resultIdx);
+  return {operation->getResult(resultIdx), -1};
 }
 
 /// Create a random program, given the decisions taken from chooser.
@@ -359,7 +382,7 @@ OwningOpRef<ModuleOp> createProgram(
                      availableAttributes, numArgs, createValueOutOfThinAir);
 
   auto type = availableTypes[chooser->choose(availableTypes.size())];
-  auto root = info.addRootedOperation(type, numOps);
+  auto [root, isZeroCost] = info.addRootedOperation(type, numOps);
   if (!root.has_value())
     return nullptr;
   builder.create<func::ReturnOp>(unknownLoc, *root);

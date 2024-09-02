@@ -79,15 +79,15 @@ struct GeneratorInfo {
     dominatingValues[value.getType()].push_back(value);
   }
 
-  /// Get a value in the program.
-  std::optional<mlir::Value> getValue(mlir::Type type) {
+  /// Get a value in the program and its index in the dominating array.
+  std::pair<std::optional<mlir::Value>, int> getValue(mlir::Type type) {
     auto &domValues = dominatingValues[type];
 
     if (domValues.size() == 0) {
-      return {};
+      return {{}, -1};
     }
     auto choice = chooser->choose(domValues.size());
-    return domValues[choice];
+    return {domValues[choice], choice};
   }
 
   mlir::Value addFunctionArgument(mlir::Type type) {
@@ -129,10 +129,11 @@ struct GeneratorInfo {
                                    int fuel);
 
   /// Add an operation with a given result type.
-  /// Return the result that has has the requested type.
-  /// This function will also create a number proportional to `fuel` operations.
-  std::optional<mlir::Value> addRootedOperation(mlir::Type resultType,
-                                                int fuel);
+  /// Return the result that has has the requested type and the index of that
+  /// value if it has zero cost. This function will also create a number
+  /// proportional to `fuel` operations.
+  std::pair<std::optional<mlir::Value>, int>
+  addRootedOperation(mlir::Type resultType, int fuel);
 };
 
 /// Create a random program, given the decisions taken from chooser.

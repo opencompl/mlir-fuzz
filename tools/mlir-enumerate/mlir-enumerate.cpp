@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
     auto &domValues = info.dominatingValues[type];
 
     if (domValues.size()) {
-      auto value = info.getValue(type);
+      auto [value, valueIndex] = info.getValue(type);
       assert(value && "Error in generator logic");
       return *value;
     }
