@@ -6,17 +6,17 @@ module {
   irdl.dialect @arith {
 
 
-    irdl.operation @andi attributes {commutativity}{
-    //irdl.operation @andi {
-      %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+    //irdl.operation @addi attributes {commutativity}{
+    irdl.operation @addi attributes {commutativity} {
+          %integer = irdl.base "!builtin.integer"
+          irdl.operands(%integer, %integer)
+          irdl.results(%integer)
     }
 
-    //irdl.operation @xori {
-    //  %integer = irdl.base "!builtin.integer"
-    //  irdl.operands(%integer, %integer)
-    //  irdl.results(%integer)
-    //}
+    irdl.operation @muli attributes {commutativity} {
+          %integer = irdl.base "!builtin.integer"
+          irdl.operands(%integer, %integer)
+          irdl.results(%integer)
+        }
   }
 }
