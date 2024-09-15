@@ -14,6 +14,7 @@
 #define MLIR_FUZZ_GENERATOR_INFO_H
 
 #include "guide.h"
+#include <functional>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
@@ -78,15 +79,15 @@ struct GeneratorInfo {
     dominatingValues[value.getType()].push_back(value);
   }
 
-  /// Get a value in the program.
-  std::optional<mlir::Value> getValue(mlir::Type type) {
+  /// Get a value in the program and its index in the dominating array.
+  std::pair<std::optional<mlir::Value>, int> getValue(mlir::Type type) {
     auto &domValues = dominatingValues[type];
 
     if (domValues.size() == 0) {
-      return {};
+      return {{}, -1};
     }
     auto choice = chooser->choose(domValues.size());
-    return domValues[choice];
+    return {domValues[choice], choice};
   }
 
   mlir::Value addFunctionArgument(mlir::Type type) {
@@ -111,11 +112,28 @@ struct GeneratorInfo {
   std::vector<std::pair<mlir::irdl::OperationOp, std::vector<int>>>
   getOperationsWithResultType(mlir::Type resultType);
 
+  /// Return the list of operations that can have a particular result type as
+  /// result with a filter.
+  /// We only consider operations making filter true.
+  /// Returns as well the indices of the results that can have this result type.
+  std::vector<std::pair<mlir::irdl::OperationOp, std::vector<int>>>
+  getOperationsWithResultType(
+      mlir::Type resultType,
+      std::function<bool(mlir::irdl::OperationOp)> filter);
+
+  /// Create an operation with a given operation op
+  /// Return the operation created
+  /// This function is used inside of addRootedOperation
+  mlir::Operation *createOperation(mlir::irdl::OperationOp op,
+                                   mlir::Type resultType, int resultIdx,
+                                   int fuel);
+
   /// Add an operation with a given result type.
-  /// Return the result that has has the requested type.
-  /// This function will also create a number proportional to `fuel` operations.
-  std::optional<mlir::Value> addRootedOperation(mlir::Type resultType,
-                                                int fuel);
+  /// Return the result that has has the requested type and the index of that
+  /// value if it has zero cost. This function will also create a number
+  /// proportional to `fuel` operations.
+  std::pair<std::optional<mlir::Value>, int>
+  addRootedOperation(mlir::Type resultType, int fuel);
 };
 
 /// Create a random program, given the decisions taken from chooser.

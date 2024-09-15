@@ -74,7 +74,7 @@ OwningOpRef<ModuleOp> createProgramFromInput(
       info.addDominatingValue(result);
 
   auto type = func.getFunctionType().getResult(0);
-  auto root = info.addRootedOperation(type, numOps);
+  auto [root, rootIsZeroCost] = info.addRootedOperation(type, numOps);
   if (!root.has_value())
     return nullptr;
   builder.create<func::ReturnOp>(unknownLoc, *root);
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
         op->getName().getStringRef() != "hw.constant")
       numInputOps += 1;
   });
-  maxNumOps = std::min((int)maxNumOps, numInputOps - 1);
+  maxNumOps = std::min((int)maxNumOps, numInputOps);
 
   // Try to parse the dialects.
   auto optDialects = parseMLIRFile(ctx, inputIRDLFilename);
@@ -169,7 +169,6 @@ int main(int argc, char **argv) {
   std::vector<OperationOp> availableOps = {};
   dialects->walk(
       [&availableOps](OperationOp op) { availableOps.push_back(op); });
-
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
