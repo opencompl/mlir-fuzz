@@ -3,13 +3,7 @@
 BUILD_DIR=${1:-"build"}
 INSTALL_DIR=${2:-"install"}
 
-if command -v mold > /dev/null; then
-  BEST_LINKER="mold"
-elif command -v lld > /dev/null; then
-  BEST_LINKER="lld"
-else
-  BEST_LINKER="ld"
-fi
+BEST_LINKER="ld"
 
 LINKER=${3:-${BEST_LINKER}}
 
