@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
       return info.addFunctionArgument(type);
 
     if (!noConstantsBool && constantName != "") {
-      if (auto intType = type.dyn_cast<IntegerType>()) {
+      if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
         auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
 
         OperationState state(
