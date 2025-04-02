@@ -12,29 +12,29 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result1: %T)
     // }
 
     irdl.operation @addi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @addui_extended {
     //   %integer = irdl.base "!builtin.integer"
     //   %i1 = irdl.is i1
-    //   irdl.operands(%integer, %integer)
-    //   irdl.results(%integer, %i1)
+    //   irdl.operands(operand0: %integer, operand1: %integer)
+    //   irdl.results(result0: %integer, result1: %i1)
     // }
 
     irdl.operation @andi {
       %i1 = irdl.is i1
       %integer = irdl.base "!builtin.integer"
       %T = irdl.any_of(%integer)
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @bitcast {
@@ -48,20 +48,20 @@ module {
     //   %f128 = irdl.is f128
     //   %input = irdl.any_of(%integer1, %bf16, %f16, %f32, %f64, %f80, %f128)
     //   %output = irdl.any_of(%integer2, %bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%input)
-    //   irdl.results(%output)
+    //   irdl.operands(operand0: %input)
+    //   irdl.results(result1: %output)
     // }
  
     irdl.operation @ceildivsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @ceildivui {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @cmpf {
@@ -91,8 +91,8 @@ module {
     // 
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
     //   %predT = irdl.any_of(%0, %1, %2, %3, %4, %5, %6, %7, %8, %9, %10, %11, %12, %13, %14, %15)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%i1)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %i1)
     //   irdl.attributes { "predicate" = %predT }
     // }
 
@@ -112,8 +112,8 @@ module {
 
       %predT = irdl.any_of(%0, %1, %2, %3, %4, %5, %6, %7, %8, %9)
       irdl.attributes {"predicate" = %predT}
-      irdl.operands(%integer, %integer)
-      irdl.results(%i1)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %i1)
     }
 
     // irdl.operation @divf {
@@ -124,20 +124,20 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %T)
     // }
 
     irdl.operation @divsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @divui {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @extf {
@@ -149,28 +149,28 @@ module {
     //   %f128 = irdl.is f128
     //   %T1 = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
     //   %T2 = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T1)
-    //   irdl.results(%T2)
+    //   irdl.operands(operand0: %T1)
+    //   irdl.results(result0: %T2)
     // }
 
     irdl.operation @extsi {
       %T1 = irdl.base "!builtin.integer"
       %T2 = irdl.base "!builtin.integer"
-      irdl.operands(%T1)
-      irdl.results(%T2)
+      irdl.operands(operand0: %T1)
+      irdl.results(result0: %T2)
     }
 
     irdl.operation @extui {
       %T1 = irdl.base "!builtin.integer"
       %T2 = irdl.base "!builtin.integer"
-      irdl.operands(%T1)
-      irdl.results(%T2)
+      irdl.operands(operand0: %T1)
+      irdl.results(result0: %T2)
     }
 
     irdl.operation @floordivsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @fptosi {
@@ -184,8 +184,8 @@ module {
     //   %f128 = irdl.is f128
     //   
     //   %Tf = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%Tf)
-    //   irdl.results(%integer)
+    //   irdl.operands(operand0: %Tf)
+    //   irdl.results(result0: %integer)
     // }
 
     // irdl.operation @fptoui {
@@ -199,8 +199,8 @@ module {
     //   %f128 = irdl.is f128
     //   
     //   %Tf = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%Tf)
-    //   irdl.results(%integer)
+    //   irdl.operands(operand0: %Tf)
+    //   irdl.results(result0: %integer)
     // }
 
     // irdl.operation @maxf {
@@ -211,20 +211,20 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %T)
     // }
 
     irdl.operation @maxsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @maxui {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @minf {
@@ -235,20 +235,20 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %T)
     // }
 
     irdl.operation @minsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @minui {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @mulf {
@@ -259,20 +259,20 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %T)
     // }
 
     irdl.operation @muli {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @mului_extended {
     //   %integer = irdl.base "!builtin.integer"
-    //   irdl.operands(%integer, %integer)
-    //   irdl.results(%integer, %integer)
+    //   irdl.operands(operand0: %integer, operand1: %integer)
+    //   irdl.results(result0: %integer, result1: %integer)
     // }
 
     // irdl.operation @negf {
@@ -283,14 +283,14 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T)
+    //   irdl.results(result0: %T)
     // }
 
     irdl.operation @ori {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @remf {
@@ -301,45 +301,45 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %T)
     // }
 
     irdl.operation @remsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @remui {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @select {
       %i1 = irdl.is i1
       %T = irdl.any
-      irdl.operands(%i1, %T, %T)
-      irdl.results(%T)
+      irdl.operands(operand0: %i1, operand1: %T, operand2: %T)
+      irdl.results(result0: %T)
     }
 
     irdl.operation @shli {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @shrsi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @shrui {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @sitofp {
@@ -365,15 +365,15 @@ module {
     //   %f80 = irdl.is f80
     //   %f128 = irdl.is f128
     //   %T = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T, %T)
-    //   irdl.results(%T)
+    //   irdl.operands(operand0: %T, operand1: %T)
+    //   irdl.results(result0: %T)
     // }
 
 
     irdl.operation @subi {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     // irdl.operation @truncf {
@@ -385,16 +385,16 @@ module {
     //   %f128 = irdl.is f128
     //   %T1 = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
     //   %T2 = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%T1)
-    //   irdl.results(%T2)
+    //   irdl.operands(operand0: %T1)
+    //   irdl.results(result0: %T2)
     // }
 
 
     irdl.operation @trunci {
       %integer1 = irdl.base "!builtin.integer"
       %integer2 = irdl.base "!builtin.integer"
-      irdl.operands(%integer1)
-      irdl.results(%integer2)
+      irdl.operands(operand0: %integer1)
+      irdl.results(result1: %integer2)
     }
 
     // irdl.operation @uitofp {
@@ -408,14 +408,14 @@ module {
     //   %f128 = irdl.is f128
     //   
     //   %Tf = irdl.any_of(%bf16, %f16, %f32, %f64, %f80, %f128)
-    //   irdl.operands(%integer)
-    //   irdl.results(%Tf)
+    //   irdl.operands(operand0: %integer)
+    //   irdl.results(result0: %Tf)
     // }
 
     irdl.operation @xori {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
   }
 }

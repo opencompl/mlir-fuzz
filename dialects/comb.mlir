@@ -5,26 +5,26 @@ module {
   irdl.dialect @comb {
     irdl.operation @add {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @and {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @divs {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @divu {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @icmp {
@@ -48,77 +48,77 @@ module {
       %integer = irdl.base "!builtin.integer"
       %i1 = irdl.is i1
 
-      irdl.operands(%integer, %integer)
-      irdl.results(%i1)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %i1)
       irdl.attributes { "predicate" = %predicate }
     }
 
     irdl.operation @mods {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @modu {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @mul {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @mux {
       %i1 = irdl.is i1
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%i1, %integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %i1, operand1: %integer, operand2: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @or {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @parity {
       %integer = irdl.base "!builtin.integer"
       %i1 = irdl.is i1
-      irdl.operands(%integer)
-      irdl.results(%i1)
+      irdl.operands(operand0: %integer)
+      irdl.results(result0: %i1)
     }
 
     irdl.operation @shl {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @shrs {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @shru {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @sub {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
 
     irdl.operation @xor {
       %integer = irdl.base "!builtin.integer"
-      irdl.operands(%integer, %integer)
-      irdl.results(%integer)
+      irdl.operands(operand0: %integer, operand1: %integer)
+      irdl.results(result0: %integer)
     }
   }
 }

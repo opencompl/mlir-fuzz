@@ -35,7 +35,7 @@ GeneratorInfo::GeneratorInfo(
           info.chooser->choose(2) == 0)
         return info.addFunctionArgument(type);
 
-      if (auto intType = type.dyn_cast<IntegerType>())
+      if (auto intType = mlir::dyn_cast<IntegerType>(type))
         return info.createIntegerValue(intType);
       return {};
     };
@@ -56,7 +56,7 @@ Value GeneratorInfo::createIntegerValue(IntegerType type) {
   } else {
     value = interestingValueList[choice];
   }
-  auto typedValue = value.cast<TypedAttr>();
+  auto typedValue = mlir::cast<TypedAttr>(value);
   auto constant =
       builder.create<arith::ConstantOp>(UnknownLoc::get(ctx), typedValue);
   return constant.getResult();

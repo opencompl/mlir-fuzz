@@ -37,7 +37,7 @@ std::vector<Type> getSatisfyingTypes(MLIRContext &ctx, int constraint,
   auto res = getSatisfyingAttrs(ctx, constraint, context, availableAttrs);
   std::vector<Type> resType;
   for (auto attr : res) {
-    resType.push_back(attr.cast<TypeAttr>().getValue());
+    resType.push_back(mlir::cast<TypeAttr>(attr).getValue());
   }
   return resType;
 }
@@ -114,6 +114,7 @@ getAttributesConstraints(mlir::irdl::OperationOp op) {
 
   std::vector<std::pair<StringRef, mlir::Value>> res;
   for (size_t i = 0; i < attrNames.size(); i++)
-    res.emplace_back(attrNames[i].cast<StringAttr>().getValue(), attrValues[i]);
+    res.emplace_back(mlir::cast<StringAttr>(attrNames[i]).getValue(),
+                     attrValues[i]);
   return res;
 }
