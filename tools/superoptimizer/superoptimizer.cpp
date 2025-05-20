@@ -177,8 +177,7 @@ int main(int argc, char **argv) {
 
   auto createValueOutOfThinAir = [&ctx](GeneratorInfo &info,
                                         Type type) -> std::optional<Value> {
-    OperationState state(UnknownLoc::get(&ctx), "smt.synth.constant", {},
-                         {type});
+    OperationState state(UnknownLoc::get(&ctx), "synth.constant", {}, {type});
     auto op = info.builder.create(state);
     return op->getResult(0);
   };

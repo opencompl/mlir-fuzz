@@ -18,8 +18,15 @@ module {
 
     irdl.operation @addi {
       %integer = irdl.base "!builtin.integer"
+      %ovf_none = irdl.is #arith.overflow<none>
+      %ovf_nsw = irdl.is #arith.overflow<nsw>
+      %ovf_nuw = irdl.is #arith.overflow<nuw>
+      %ovf_nsw_nuw = irdl.is #arith.overflow<nsw,nuw>
+      %ovf = irdl.any_of(%ovf_none, %ovf_nsw, %ovf_nuw, %ovf_nsw_nuw)
+
       irdl.operands(operand0: %integer, operand1: %integer)
       irdl.results(result0: %integer)
+      irdl.attributes {"overflowFlags" = %ovf}
     }
 
     // irdl.operation @addui_extended {

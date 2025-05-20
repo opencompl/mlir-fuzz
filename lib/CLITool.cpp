@@ -1,5 +1,6 @@
 #include "CLITool.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -14,11 +15,25 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
 
 std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getI64IntegerAttr(0), builder.getI64IntegerAttr(1),
-          builder.getI64IntegerAttr(2), builder.getI64IntegerAttr(3),
-          builder.getI64IntegerAttr(4), builder.getI64IntegerAttr(5),
-          builder.getI64IntegerAttr(6), builder.getI64IntegerAttr(7),
-          builder.getI64IntegerAttr(8), builder.getI64IntegerAttr(9)};
+  return {builder.getI64IntegerAttr(0),
+          builder.getI64IntegerAttr(1),
+          builder.getI64IntegerAttr(2),
+          builder.getI64IntegerAttr(3),
+          builder.getI64IntegerAttr(4),
+          builder.getI64IntegerAttr(5),
+          builder.getI64IntegerAttr(6),
+          builder.getI64IntegerAttr(7),
+          builder.getI64IntegerAttr(8),
+          builder.getI64IntegerAttr(9),
+          arith::IntegerOverflowFlagsAttr::get(
+              &ctx, arith::IntegerOverflowFlags::none),
+          arith::IntegerOverflowFlagsAttr::get(
+              &ctx, arith::IntegerOverflowFlags::nsw),
+          arith::IntegerOverflowFlagsAttr::get(
+              &ctx, arith::IntegerOverflowFlags::nuw),
+          arith::IntegerOverflowFlagsAttr::get(
+              &ctx, arith::IntegerOverflowFlags::nsw |
+                        arith::IntegerOverflowFlags::nuw)};
 }
 
 std::optional<OwningOpRef<ModuleOp>> parseMLIRFile(MLIRContext &ctx,
