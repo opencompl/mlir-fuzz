@@ -1,6 +1,7 @@
 #include "CLITool.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -10,7 +11,11 @@ using namespace mlir;
 
 std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
   Builder builder(&ctx);
-  return {builder.getIntegerType(1), builder.getIntegerType(32)};
+  return {
+      builder.getIntegerType(1),
+      builder.getIntegerType(32),
+      smt::BoolType::get(&ctx),
+  };
 }
 
 std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx) {
