@@ -116,6 +116,21 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Use the input operations to enumerate programs"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<Configuration> configuration(
+      "configuration",
+      llvm::cl::desc(
+          "Configuration to use for generating types and attributes"),
+      llvm::cl::init(Configuration::Arith),
+      llvm::cl::values(clEnumValN(Configuration::Arith, "arith",
+                                  "Generate types and attributes for the arith "
+                                  "dialect (default)"),
+                       clEnumValN(Configuration::Comb, "comb",
+                                  "Generate types and attributes for the comb "
+                                  "dialect"),
+                       clEnumValN(Configuration::SMT, "smt",
+                                  "Generate types and attributes for the smt "
+                                  "dialect")));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR superoptimizer");
 
@@ -184,8 +199,8 @@ int main(int argc, char **argv) {
 
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgramFromInput(
-        ctx, inputFunc, availableOps, getAvailableTypes(ctx),
-        getAvailableAttributes(ctx), chooser.get(), maxNumOps,
+        ctx, inputFunc, availableOps, getAvailableTypes(ctx, configuration),
+        getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
         correctProgramCounter, createValueOutOfThinAir, useInputOps);
     if (!module)
       continue;

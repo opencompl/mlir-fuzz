@@ -81,6 +81,21 @@ int main(int argc, char **argv) {
       "seed", llvm::cl::desc("Specify random seed used in generation"),
       llvm::cl::init(-1));
 
+  static llvm::cl::opt<Configuration> configuration(
+      "configuration",
+      llvm::cl::desc(
+          "Configuration to use for generating types and attributes"),
+      llvm::cl::init(Configuration::Arith),
+      llvm::cl::values(clEnumValN(Configuration::Arith, "arith",
+                                  "Generate types and attributes for the arith "
+                                  "dialect (default)"),
+                       clEnumValN(Configuration::Comb, "comb",
+                                  "Generate types and attributes for the comb "
+                                  "dialect"),
+                       clEnumValN(Configuration::SMT, "smt",
+                                  "Generate types and attributes for the smt "
+                                  "dialect")));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -178,10 +193,10 @@ int main(int argc, char **argv) {
   }
 
   while (auto chooser = makeChooser()) {
-    auto module = createProgram(ctx, availableOps, getAvailableTypes(ctx),
-                                getAvailableAttributes(ctx), chooser.get(),
-                                maxNumOps, maxNumArgs, correctProgramCounter,
-                                createValueOutOfThinAir);
+    auto module = createProgram(
+        ctx, availableOps, getAvailableTypes(ctx, configuration),
+        getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
+        maxNumArgs, correctProgramCounter, createValueOutOfThinAir);
 
     programCounter += 1;
     if (!module)

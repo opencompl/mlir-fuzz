@@ -17,11 +17,19 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 
-/// Get the types that the fuzzer supports.
-std::vector<mlir::Type> getAvailableTypes(mlir::MLIRContext &ctx);
+enum class Configuration {
+  Arith,
+  Comb,
+  SMT,
+};
 
 /// Get the types that the fuzzer supports.
-std::vector<mlir::Attribute> getAvailableAttributes(mlir::MLIRContext &ctx);
+std::vector<mlir::Type> getAvailableTypes(mlir::MLIRContext &ctx,
+                                          Configuration config);
+
+/// Get the types that the fuzzer supports.
+std::vector<mlir::Attribute> getAvailableAttributes(mlir::MLIRContext &ctx,
+                                                    Configuration config);
 
 /// Parse an MLIR file given a filename.
 std::optional<mlir::OwningOpRef<mlir::ModuleOp>>

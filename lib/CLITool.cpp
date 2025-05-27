@@ -9,36 +9,51 @@
 
 using namespace mlir;
 
-std::vector<Type> getAvailableTypes(MLIRContext &ctx) {
+std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
   Builder builder(&ctx);
-  return {
-      builder.getIntegerType(1),
-      builder.getIntegerType(32),
-      smt::BoolType::get(&ctx),
-  };
+  switch (config) {
+  case Configuration::Arith:
+  case Configuration::Comb:
+    return {
+        builder.getIntegerType(1),
+        builder.getIntegerType(64),
+    };
+  case Configuration::SMT:
+    return {smt::BoolType::get(&ctx)};
+  }
+  llvm_unreachable("Unknown configuration");
 }
 
-std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx) {
+std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
+                                              Configuration config) {
   Builder builder(&ctx);
-  return {builder.getI64IntegerAttr(0),
-          builder.getI64IntegerAttr(1),
-          builder.getI64IntegerAttr(2),
-          builder.getI64IntegerAttr(3),
-          builder.getI64IntegerAttr(4),
-          builder.getI64IntegerAttr(5),
-          builder.getI64IntegerAttr(6),
-          builder.getI64IntegerAttr(7),
-          builder.getI64IntegerAttr(8),
-          builder.getI64IntegerAttr(9),
-          arith::IntegerOverflowFlagsAttr::get(
-              &ctx, arith::IntegerOverflowFlags::none),
-          arith::IntegerOverflowFlagsAttr::get(
-              &ctx, arith::IntegerOverflowFlags::nsw),
-          arith::IntegerOverflowFlagsAttr::get(
-              &ctx, arith::IntegerOverflowFlags::nuw),
-          arith::IntegerOverflowFlagsAttr::get(
-              &ctx, arith::IntegerOverflowFlags::nsw |
-                        arith::IntegerOverflowFlags::nuw)};
+  switch (config) {
+  case Configuration::Arith:
+  case Configuration::Comb:
+    return {builder.getI64IntegerAttr(0),
+            builder.getI64IntegerAttr(1),
+            builder.getI64IntegerAttr(2),
+            builder.getI64IntegerAttr(3),
+            builder.getI64IntegerAttr(4),
+            builder.getI64IntegerAttr(5),
+            builder.getI64IntegerAttr(6),
+            builder.getI64IntegerAttr(7),
+            builder.getI64IntegerAttr(8),
+            builder.getI64IntegerAttr(9),
+            arith::IntegerOverflowFlagsAttr::get(
+                &ctx, arith::IntegerOverflowFlags::none),
+            arith::IntegerOverflowFlagsAttr::get(
+                &ctx, arith::IntegerOverflowFlags::nsw),
+            arith::IntegerOverflowFlagsAttr::get(
+                &ctx, arith::IntegerOverflowFlags::nuw),
+            arith::IntegerOverflowFlagsAttr::get(
+                &ctx, arith::IntegerOverflowFlags::nsw |
+                          arith::IntegerOverflowFlags::nuw)};
+  case Configuration::SMT:
+    return {IntegerAttr::get(builder.getIntegerType(1), -1),
+            IntegerAttr::get(builder.getIntegerType(1), 0)};
+  }
+  llvm_unreachable("Unknown configuration");
 }
 
 std::optional<OwningOpRef<ModuleOp>> parseMLIRFile(MLIRContext &ctx,
