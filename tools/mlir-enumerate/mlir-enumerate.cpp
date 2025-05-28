@@ -40,6 +40,12 @@ int main(int argc, char **argv) {
           "Expect a new line in stdin before printing the next program"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<bool> count(
+      "count",
+      llvm::cl::desc(
+          "Print the number of programs that would be generated, and halt"),
+      llvm::cl::init(false));
+
   // Number of non-constant operations to be printed.
   static llvm::cl::opt<int> maxNumOps(
       "max-num-ops",
@@ -214,9 +220,11 @@ int main(int argc, char **argv) {
     correctProgramCounter += 1;
 
     // Print the program to stdout.
-    module->print(llvm::outs(), printingFlags);
-    llvm::outs() << "// -----\n";
-    llvm::outs().flush();
+    if (!count) {
+      module->print(llvm::outs(), printingFlags);
+      llvm::outs() << "// -----\n";
+      llvm::outs().flush();
+    }
 
     if (maxPrograms != -1 && correctProgramCounter >= (size_t)maxPrograms)
       break;
@@ -227,5 +235,11 @@ int main(int argc, char **argv) {
       if (c == 'q')
         break;
     }
+  }
+
+  if (count) {
+    llvm::outs() << correctProgramCounter;
+    llvm::outs() << "\n";
+    llvm::outs().flush();
   }
 }
