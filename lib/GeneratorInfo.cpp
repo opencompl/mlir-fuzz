@@ -330,7 +330,7 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
   // When we don't have fuel anymore, we either use a dominated value,
   // or we create a value out of thin air, which may include adding
   // a new function argument.
-  if (fuel == 0)
+  if (fuel == 0 || chooser->choose(2) == 0)
     return getZeroCostValue(*this, resultType);
 
   // Cost of the current operation being created.
