@@ -15,6 +15,7 @@
 
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
+#include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
@@ -87,6 +88,11 @@ int main(int argc, char **argv) {
       "seed", llvm::cl::desc("Specify random seed used in generation"),
       llvm::cl::init(-1));
 
+  static llvm::cl::opt<bool> allowUnusedArguments(
+      "allow-unused-arguments",
+      llvm::cl::desc("Allow unused arguments in the generated functions"),
+      llvm::cl::init(false));
+
   static llvm::cl::opt<Configuration> configuration(
       "configuration",
       llvm::cl::desc(
@@ -154,6 +160,13 @@ int main(int argc, char **argv) {
     if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
         (noConstantsBool || info.chooser->choose(2) == 0))
       return info.addFunctionArgument(type);
+
+    if (configuration == Configuration::SMT && mlir::isa<smt::BoolType>(type)) {
+      bool value = (info.chooser->choose(2) == 0);
+      auto op =
+          info.builder.create<smt::BoolConstantOp>(UnknownLoc::get(ctx), value);
+      return op.getResult();
+    }
 
     if (!noConstantsBool && constantName != "") {
       if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
