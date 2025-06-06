@@ -21,6 +21,7 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -91,6 +92,11 @@ int main(int argc, char **argv) {
   static llvm::cl::opt<bool> allowUnusedArguments(
       "allow-unused-arguments",
       llvm::cl::desc("Allow unused arguments in the generated functions"),
+      llvm::cl::init(false));
+
+  static llvm::cl::opt<bool> cse(
+      "cse",
+      llvm::cl::desc("Run cse on the generated program before printing it"),
       llvm::cl::init(false));
 
   static llvm::cl::opt<Configuration> configuration(
@@ -229,6 +235,17 @@ int main(int argc, char **argv) {
           &ctx, [](Diagnostic &) { return success(); });
       if (verify(*module, true).failed())
         continue;
+    }
+
+    // Optionally run CSE
+    if (cse) {
+      auto pm = PassManager::on<ModuleOp>(&ctx);
+      pm.addPass(mlir::createCSEPass());
+      if (failed(pm.run(*module))) {
+        llvm::errs() << "Failed to run CSE on a generated program.\n";
+        module->dump();
+        continue;
+      }
     }
     correctProgramCounter += 1;
 
