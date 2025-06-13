@@ -21,6 +21,7 @@ enum class Configuration {
   Arith,
   Comb,
   SMT,
+  LLVM,
 };
 
 /// Get the types that the fuzzer supports.
