@@ -69,6 +69,8 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
             builder.getI64IntegerAttr(7),
             builder.getI64IntegerAttr(8),
             builder.getI64IntegerAttr(9),
+            builder.getUnitAttr(), // For 'exact'
+            builder.getUnitAttr(),  // For 'disjoint'
             LLVM::IntegerOverflowFlagsAttr::get(
                     &ctx, LLVM::IntegerOverflowFlags::none),
             LLVM::IntegerOverflowFlagsAttr::get(

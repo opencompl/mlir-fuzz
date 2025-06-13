@@ -15,6 +15,8 @@ module {
       //%is_exact = irdl.is #llvm.isDisjoint
       irdl.operands(operand0: %integer, operand1: %integer)
       irdl.results(result0: %integer)
+      %unit = irdl.is unit
+      irdl.attributes {"isDisjointFlag" = %unit}
       // irdl.attributes {"isDisjoint" = %disjoint}
     }
 
@@ -65,12 +67,16 @@ module {
       %integer = irdl.is i64
       irdl.operands(operand0: %integer, operand1: %integer)
       irdl.results(result0: %integer)
+      %unit = irdl.is unit
+      irdl.attributes {"isExactFlag" = %unit}
     }
 
     irdl.operation @ashr {  // to do : support is exact flag 
     %integer = irdl.is i64
     irdl.operands(operand0: %integer, operand1: %integer)
     irdl.results(result0: %integer)
+    %unit = irdl.is unit
+    irdl.attributes {"isExactFlag" = %unit}
     }
 
     irdl.operation @mul { // to do : support llvm flags and not arith
@@ -89,6 +95,8 @@ module {
      %integer = irdl.is i64
       irdl.operands(operand0: %integer, operand1: %integer)
       irdl.results(result0: %integer)
+      %unit = irdl.is unit
+      irdl.attributes {"isExactFlag" = %unit}
     }
 
     irdl.operation @udiv { // needs to isExact flag
@@ -145,7 +153,7 @@ module {
     irdl.results(result0: %integer1)
 
     }
-    
+
     irdl.operation @sext { //currently only support i1 to i64 sign extension
     %integer1 = irdl.is i1
     %integer = irdl.is i64
