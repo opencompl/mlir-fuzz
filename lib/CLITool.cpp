@@ -69,15 +69,16 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
             builder.getI64IntegerAttr(7),
             builder.getI64IntegerAttr(8),
             builder.getI64IntegerAttr(9),
-            arith::IntegerOverflowFlagsAttr::get(
-                    &ctx, arith::IntegerOverflowFlags::none),
-            arith::IntegerOverflowFlagsAttr::get(
-                    &ctx, arith::IntegerOverflowFlags::nsw),
-            arith::IntegerOverflowFlagsAttr::get(
-                    &ctx, arith::IntegerOverflowFlags::nuw),
-            arith::IntegerOverflowFlagsAttr::get(
-                    &ctx, arith::IntegerOverflowFlags::nsw |
-            arith::IntegerOverflowFlags::nuw)};
+            LLVM::IntegerOverflowFlagsAttr::get(
+                    &ctx, LLVM::IntegerOverflowFlags::none),
+            LLVM::IntegerOverflowFlagsAttr::get(
+                    &ctx, LLVM::IntegerOverflowFlags::nsw),
+            LLVM::IntegerOverflowFlagsAttr::get(
+                    &ctx, LLVM::IntegerOverflowFlags::nuw),
+            LLVM::IntegerOverflowFlagsAttr::get(
+                    &ctx, LLVM::IntegerOverflowFlags::nsw |
+            LLVM::IntegerOverflowFlags::nuw)};
+
   case Configuration::SMT:
     return {IntegerAttr::get(builder.getIntegerType(1), -1),
             IntegerAttr::get(builder.getIntegerType(1), 0)};

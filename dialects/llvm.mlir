@@ -2,7 +2,8 @@ module {
   irdl.dialect @llvm {
 
     // need to specfic constants 
-    
+    //  | LLVM.Op.const _ val    => const? _ val
+
     irdl.operation @and {
      %integer = irdl.is i64
       irdl.operands(operand0: %integer, operand1: %integer)
@@ -23,12 +24,12 @@ module {
       irdl.results(result0: %integer)
     }
 
-    irdl.operation @add { // to do: need to constructpropr llvm flags and not artih flags
+    irdl.operation @add { // to do: need to add llvm flags and not artih flags probably at CLITool.cpp
       %integer = irdl.is i64
-      %ovf_none = irdl.is #arith.overflow<none>
-      %ovf_nsw = irdl.is #arith.overflow<nsw>
-      %ovf_nuw = irdl.is #arith.overflow<nuw>
-      %ovf_nsw_nuw = irdl.is #arith.overflow<nsw,nuw>
+      %ovf_none = irdl.is #llvm.overflow<none>
+      %ovf_nsw = irdl.is #llvm.overflow<nsw>
+      %ovf_nuw = irdl.is #llvm.overflow<nuw>
+      %ovf_nsw_nuw = irdl.is #llvm.overflow<nsw,nuw>
       %ovf = irdl.any_of(%ovf_none, %ovf_nsw, %ovf_nuw, %ovf_nsw_nuw)
       irdl.operands(operand0: %integer, operand1: %integer)
       
@@ -38,10 +39,10 @@ module {
 
     irdl.operation @sub { // to do: register correct flags aka do not use the arith flags 
       %integer = irdl.is i64
-      %ovf_none = irdl.is #arith.overflow<none>
-      %ovf_nsw = irdl.is #arith.overflow<nsw>
-      %ovf_nuw = irdl.is #arith.overflow<nuw>
-      %ovf_nsw_nuw = irdl.is #arith.overflow<nsw,nuw>
+      %ovf_none = irdl.is #llvm.overflow<none>
+      %ovf_nsw = irdl.is #llvm.overflow<nsw>
+      %ovf_nuw = irdl.is #llvm.overflow<nuw>
+      %ovf_nsw_nuw = irdl.is #llvm.overflow<nsw,nuw>
       %ovf = irdl.any_of(%ovf_none, %ovf_nsw, %ovf_nuw, %ovf_nsw_nuw)
       irdl.operands(operand0: %integer, operand1: %integer)
       irdl.results(result0: %integer)
@@ -51,10 +52,10 @@ module {
     irdl.operation @shl {  // to do: use the correct flags 
       %integer = irdl.is i64
       irdl.operands(operand0: %integer, operand1: %integer)
-      %ovf_none = irdl.is #arith.overflow<none>
-      %ovf_nsw = irdl.is #arith.overflow<nsw>
-      %ovf_nuw = irdl.is #arith.overflow<nuw>
-      %ovf_nsw_nuw = irdl.is #arith.overflow<nsw,nuw>
+      %ovf_none = irdl.is #llvm.overflow<none>
+      %ovf_nsw = irdl.is #llvm.overflow<nsw>
+      %ovf_nuw = irdl.is #llvm.overflow<nuw>
+      %ovf_nsw_nuw = irdl.is #llvm.overflow<nsw,nuw>
       %ovf = irdl.any_of(%ovf_none, %ovf_nsw, %ovf_nuw, %ovf_nsw_nuw)
       irdl.results(result0: %integer)
       irdl.attributes {"overflowFlags" = %ovf}
@@ -75,10 +76,10 @@ module {
     irdl.operation @mul { // to do : support llvm flags and not arith
       %integer = irdl.is i64
       irdl.operands(operand0: %integer, operand1: %integer)
-      %ovf_none = irdl.is #arith.overflow<none>
-      %ovf_nsw = irdl.is #arith.overflow<nsw>
-      %ovf_nuw = irdl.is #arith.overflow<nuw>
-      %ovf_nsw_nuw = irdl.is #arith.overflow<nsw,nuw>
+      %ovf_none = irdl.is #llvm.overflow<none>
+      %ovf_nsw = irdl.is #llvm.overflow<nsw>
+      %ovf_nuw = irdl.is #llvm.overflow<nuw>
+      %ovf_nsw_nuw = irdl.is #llvm.overflow<nsw,nuw>
       %ovf = irdl.any_of(%ovf_none, %ovf_nsw, %ovf_nuw, %ovf_nsw_nuw)
       irdl.results(result0: %integer)
       irdl.attributes {"overflowFlags" = %ovf}
@@ -144,8 +145,7 @@ module {
     irdl.results(result0: %integer1)
 
     }
-
-
+    
     irdl.operation @sext { //currently only support i1 to i64 sign extension
     %integer1 = irdl.is i1
     %integer = irdl.is i64
@@ -162,7 +162,6 @@ module {
 
 }
 
-//   | LLVM.Op.const _ val    => const? _ val
 
 
 
