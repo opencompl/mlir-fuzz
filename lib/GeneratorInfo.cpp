@@ -166,7 +166,7 @@ getZeroCostValueWithIndex(GeneratorInfo &info, Type type, int index) {
 
 mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
                                                 mlir::Type resultType,
-                                                int resultIdx, int fuel) {
+                                                size_t resultIdx, int fuel) {
   const static std::string COMMUTATIVITY = "commutativity";
   auto ctx = builder.getContext();
 
@@ -303,6 +303,10 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
       return nullptr;
 
     auto attr = satisfyingAttrs[chooser->choose(satisfyingAttrs.size())];
+    // HACK: Since irdl doesn't support optional attributes yet, we consider
+    // that all unit attributes are optional, and no other attributes are.
+    if (mlir::isa<UnitAttr>(attr) && chooser->choose(2) == 0)
+      continue;
     auto succeeded = verifier.verify({}, attr, valueToIdx[constraint]);
     assert(succeeded.succeeded());
     attributes.emplace_back(StringAttr::get(ctx, name), attr);

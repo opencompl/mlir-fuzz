@@ -30,7 +30,8 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
   switch (config) {
   case Configuration::Arith:
   case Configuration::Comb:
-    return {builder.getI64IntegerAttr(0),
+    return {builder.getUnitAttr(),
+            builder.getI64IntegerAttr(0),
             builder.getI64IntegerAttr(1),
             builder.getI64IntegerAttr(2),
             builder.getI64IntegerAttr(3),
@@ -50,7 +51,8 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
                 &ctx, arith::IntegerOverflowFlags::nsw |
                           arith::IntegerOverflowFlags::nuw)};
   case Configuration::SMT:
-    return {IntegerAttr::get(builder.getIntegerType(1), -1),
+    return {builder.getUnitAttr(),
+            IntegerAttr::get(builder.getIntegerType(1), -1),
             IntegerAttr::get(builder.getIntegerType(1), 0)};
   }
   llvm_unreachable("Unknown configuration");

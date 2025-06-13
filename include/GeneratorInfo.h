@@ -125,7 +125,7 @@ struct GeneratorInfo {
   /// Return the operation created
   /// This function is used inside of addRootedOperation
   mlir::Operation *createOperation(mlir::irdl::OperationOp op,
-                                   mlir::Type resultType, int resultIdx,
+                                   mlir::Type resultType, size_t resultIdx,
                                    int fuel);
 
   /// Add an operation with a given result type.
