@@ -2,7 +2,6 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -15,11 +14,9 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
   switch (config) {
   case Configuration::Arith:
   case Configuration::Comb:
-  case Configuration::LLVM:
     return {
-        builder.getIntegerType(32),
-        builder.getIntegerType(64),
         builder.getIntegerType(1),
+        builder.getIntegerType(64),
     };
   case Configuration::SMT:
     return {smt::BoolType::get(&ctx)};
@@ -33,7 +30,6 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
   switch (config) {
   case Configuration::Arith:
   case Configuration::Comb:
-  case Configuration::LLVM:
     return {builder.getI64IntegerAttr(0),
             builder.getI64IntegerAttr(1),
             builder.getI64IntegerAttr(2),

@@ -112,11 +112,7 @@ int main(int argc, char **argv) {
                                   "dialect"),
                        clEnumValN(Configuration::SMT, "smt",
                                   "Generate types and attributes for the smt "
-                                  "dialect"),
-                        clEnumValN(Configuration::LLVM, "llvm",
-                                  "Generate types and attributes for the llvm "
-                                  "dialect"))
-                                );
+                                  "dialect")));
 
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");

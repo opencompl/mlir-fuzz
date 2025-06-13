@@ -104,7 +104,7 @@ module {
     // }
 
     irdl.operation @cmpi {
-      %integer = irdl.is "!builtin.integer"
+      %integer = irdl.base "!builtin.integer"
       %i1 = irdl.is i1
       %0 = irdl.is 0 : i64
       %1 = irdl.is 1 : i64
