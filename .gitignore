@@ -37,6 +37,7 @@ build
 
 # Language Server Protocol
 .clangd
+.cache
 
 ### CMake ###
 CMakeLists.txt.user
