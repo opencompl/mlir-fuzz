@@ -7,20 +7,29 @@
 //===----------------------------------------------------------------------===//
 
 #include <cmath>
+#include <fstream>
 #include <vector>
 
 #include "CLITool.h"
 #include "GeneratorInfo.h"
 #include "IRDLUtils.h"
 
+#include "mlir/Conversion/PDLToPDLInterp/PDLToPDLInterp.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -94,9 +103,15 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Allow unused arguments in the generated functions"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<std::string> excludeSubpatterns(
+      "exclude-subpatterns",
+      llvm::cl::desc("Do not emmit programs that contain patterns from the "
+                     "provided file"),
+      llvm::cl::init("/dev/null"));
+
   static llvm::cl::opt<bool> cse(
       "cse",
-      llvm::cl::desc("Run cse on the generated program before printing it"),
+      llvm::cl::desc("Run CSE on the generated program before printing it"),
       llvm::cl::init(false));
 
   static llvm::cl::opt<Configuration> configuration(
@@ -197,6 +212,41 @@ int main(int argc, char **argv) {
     return info.addFunctionArgument(type);
   };
 
+  // Get the list of illegal subpatterns.
+  RewritePatternSet illegals(&ctx);
+  if (excludeSubpatterns != "/dev/null") {
+    std::ifstream f(excludeSubpatterns);
+    if (!f.is_open()) {
+      exit(1);
+    }
+    std::string pattern;
+    std::string line;
+    while (std::getline(f, line)) {
+      if (line == "// -----") {
+        auto config(&ctx);
+        auto parsedModule = parseSourceString<ModuleOp>(pattern, config);
+        if (!parsedModule) {
+          parsedModule->dump();
+          std::exit(1);
+        }
+        auto module = parsedModule.release();
+        module.getOperation()->remove();
+
+        PDLPatternModule pdlPattern(module);
+        pdlPattern.registerRewriteFunction(
+            "rewriter",
+            [](PatternRewriter &rewriter, Operation *root) { /* Empty */ });
+        illegals.add(std::move(pdlPattern));
+        pattern = "";
+      } else {
+        pattern += line;
+        pattern += "\n";
+      }
+    }
+  }
+  FrozenRewritePatternSet frozenIllegals(
+      std::forward<RewritePatternSet>(illegals));
+
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
@@ -247,9 +297,18 @@ int main(int argc, char **argv) {
         continue;
       }
     }
-    correctProgramCounter += 1;
 
-    // Print the program to stdout.
+    // Make sure the program does not contain an illegal subpattern.
+    if (applyPatternsGreedily(module->getBodyRegion(), frozenIllegals,
+                              {.maxIterations = 1, .maxNumRewrites = 1})
+            .failed()) {
+      // If there is a fail, that means we matched the pattern, and apply the
+      // rewrite (which does nothing). Since the rewrite does nothing, the
+      // pattern continues to match, which causes a failure.
+      continue;
+    }
+
+    correctProgramCounter += 1;
     if (!count) {
       module->print(llvm::outs(), printingFlags);
       llvm::outs() << "// -----\n";
