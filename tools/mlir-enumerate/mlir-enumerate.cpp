@@ -217,7 +217,8 @@ int main(int argc, char **argv) {
   if (excludeSubpatterns != "/dev/null") {
     std::ifstream f(excludeSubpatterns);
     if (!f.is_open()) {
-      exit(1);
+      llvm::errs() << "Unable to open file " << excludeSubpatterns << "\n";
+      std::exit(1);
     }
     std::string pattern;
     std::string line;
@@ -226,7 +227,8 @@ int main(int argc, char **argv) {
         auto config(&ctx);
         auto parsedModule = parseSourceString<ModuleOp>(pattern, config);
         if (!parsedModule) {
-          parsedModule->dump();
+          llvm::errs() << "Unable to parse this illegal sub-pattern:\n"
+                       << pattern;
           std::exit(1);
         }
         auto module = parsedModule.release();
