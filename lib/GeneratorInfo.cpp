@@ -321,7 +321,7 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
       builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes);
   if (!attributes.empty()) {
     auto propAttr = builder.getDictionaryAttr(attributes);
-    operation->setPropertiesFromAttribute(propAttr, {});
+    assert(operation->setPropertiesFromAttribute(propAttr, {}).succeeded());
   }
   return operation;
 }
