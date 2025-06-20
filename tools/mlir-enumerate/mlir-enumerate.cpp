@@ -249,7 +249,6 @@ int main(int argc, char **argv) {
   FrozenRewritePatternSet frozenIllegals(
       std::forward<RewritePatternSet>(illegals));
 
-  size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
   // set seed to a random positive integer
@@ -275,7 +274,6 @@ int main(int argc, char **argv) {
         getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
         maxNumArgs, correctProgramCounter, createValueOutOfThinAir);
 
-    programCounter += 1;
     if (!module)
       continue;
     // Some programs still won't verify, because IRDL is not expressive enough
