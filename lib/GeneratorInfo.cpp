@@ -317,8 +317,12 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
   StringAttr opName = StringAttr::get(ctx, dialectName + "." + opSuffix);
 
   // Create the operation.
-  auto *operation = builder.create(UnknownLoc::get(ctx), opName, operands,
-                                   resultTypes, attributes);
+  auto *operation =
+      builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes);
+  if (!attributes.empty()) {
+    auto propAttr = builder.getDictionaryAttr(attributes);
+    operation->setPropertiesFromAttribute(propAttr, {});
+  }
   return operation;
 }
 
