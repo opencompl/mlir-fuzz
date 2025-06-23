@@ -129,6 +129,13 @@ int main(int argc, char **argv) {
                                   "Generate types and attributes for the smt "
                                   "dialect")));
 
+  static llvm::cl::opt<std::string> bitVectorWidths(
+      "smt-bitvector-widths",
+      llvm::cl::desc("In case the configuration is set to \"smt\", this is a "
+                     "list of comma-separated bitwidths. If not specified, "
+                     "this corresponds to no BitVector instructions."),
+      llvm::cl::init(""));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -138,6 +145,15 @@ int main(int argc, char **argv) {
   // Printing flags
   OpPrintingFlags printingFlags;
   printingFlags.printGenericOpForm(printOpGeneric);
+
+  std::vector<unsigned> smtBvWidths;
+  {
+    std::stringstream ss(bitVectorWidths);
+    std::string width;
+    while (std::getline(ss, width, ',')) {
+      smtBvWidths.push_back(std::stoi(width));
+    }
+  }
 
   // Register all dialects
   DialectRegistry registry;
@@ -172,9 +188,9 @@ int main(int argc, char **argv) {
   });
 
   bool noConstantsBool = noConstants;
-  auto createValueOutOfThinAir =
-      [constantName, noConstantsBool](GeneratorInfo &info,
-                                      Type type) -> std::optional<Value> {
+  auto createValueOutOfThinAir = [&smtBvWidths, constantName, noConstantsBool](
+                                     GeneratorInfo &info,
+                                     Type type) -> std::optional<Value> {
     auto *ctx = info.builder.getContext();
     auto func = llvm::cast<mlir::func::FuncOp>(
         *info.builder.getInsertionBlock()->getParentOp());
@@ -191,7 +207,7 @@ int main(int argc, char **argv) {
 
     if (configuration == Configuration::SMT &&
         mlir::isa<smt::BitVectorType>(type)) {
-      unsigned width = SMT_BV_WIDTHS[info.chooser->choose(SMT_BV_WIDTHS.size())];
+      unsigned width = smtBvWidths[info.chooser->choose(smtBvWidths.size())];
       // Only enumerate 0 and 1 for now.
       uint64_t value = info.chooser->choose(2);
       auto op = info.builder.create<smt::BVConstantOp>(UnknownLoc::get(ctx),
@@ -280,7 +296,7 @@ int main(int argc, char **argv) {
 
   while (auto chooser = makeChooser()) {
     auto module = createProgram(
-        ctx, availableOps, getAvailableTypes(ctx, configuration),
+        ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
         getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
         maxNumArgs, correctProgramCounter, createValueOutOfThinAir);
 

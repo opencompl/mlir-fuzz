@@ -10,7 +10,8 @@
 
 using namespace mlir;
 
-std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
+std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
+                                    std::vector<unsigned> smtBvWidths) {
   Builder builder(&ctx);
   switch (config) {
   case Configuration::Arith:
@@ -21,7 +22,7 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
     };
   case Configuration::SMT: {
     std::vector<Type> types = {smt::BoolType::get(&ctx)};
-    for (unsigned width : SMT_BV_WIDTHS) {
+    for (unsigned width : smtBvWidths) {
       types.push_back(smt::BitVectorType::get(&ctx, width));
     }
     return types;
