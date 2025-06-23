@@ -23,6 +23,8 @@ enum class Configuration {
   SMT,
 };
 
+const std::vector<unsigned> SMT_BV_WIDTHS = {4, 8};
+
 /// Get the types that the fuzzer supports.
 std::vector<mlir::Type> getAvailableTypes(mlir::MLIRContext &ctx,
                                           Configuration config);

@@ -189,6 +189,16 @@ int main(int argc, char **argv) {
       return op.getResult();
     }
 
+    if (configuration == Configuration::SMT &&
+        mlir::isa<smt::BitVectorType>(type)) {
+      unsigned width = SMT_BV_WIDTHS[info.chooser->choose(SMT_BV_WIDTHS.size())];
+      // Only enumerate 0 and 1 for now.
+      uint64_t value = info.chooser->choose(2);
+      auto op = info.builder.create<smt::BVConstantOp>(UnknownLoc::get(ctx),
+                                                       value, width);
+      return op.getResult();
+    }
+
     if (!noConstantsBool && constantName != "") {
       if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
         auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());

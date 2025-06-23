@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
+#include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -18,8 +19,13 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
         builder.getIntegerType(1),
         builder.getIntegerType(64),
     };
-  case Configuration::SMT:
-    return {smt::BoolType::get(&ctx)};
+  case Configuration::SMT: {
+    std::vector<Type> types = {smt::BoolType::get(&ctx)};
+    for (unsigned width : SMT_BV_WIDTHS) {
+      types.push_back(smt::BitVectorType::get(&ctx, width));
+    }
+    return types;
+  }
   }
   llvm_unreachable("Unknown configuration");
 }
