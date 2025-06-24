@@ -66,43 +66,54 @@ module {
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv.ashr {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.ashr {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
         // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvcmp-mlirsmtbvcmpop
 
         // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvconcat-mlirsmtconcatop
+        // How to handle sizes properly?
 
-        // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvconstant-mlirsmtbvconstantop
+        // TODO: Do we want that?
+        // https://mlir.llvm.org/docs/Dialects/SMT/#smtbvconstant-mlirsmtbvconstantop
+        // irdl.operation @bv.constant {
+        //     %bv = irdl.base "!smt.bv"
+        //     %0 = irdl.is 0
+        //     %1 = irdl.is 1
+        //     %value = irdl.any_of(%0, %1)
+        //     irdl.attributes { "value" = %value }
+        //     irdl.results(result: %bv)
+        // }
 
         // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvextract-mlirsmtextractop.
+        // How to handle sizes properly?
 
-        irdl.operation @bv.lshr {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.lshr {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.mul {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.mul {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.neg {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(input: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.neg {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(input: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.not {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(input: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.not {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(input: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
         irdl.operation @bv.or {
             %bv = irdl.base "!smt.bv"
@@ -112,46 +123,46 @@ module {
 
         // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvrepeat-mlirsmtrepeatop
 
-        irdl.operation @bv.sdiv {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.sdiv {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.shl {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.shl {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.smod {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.smod {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.srem {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.srem {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.udiv {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.udiv {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.urem {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.urem {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
 
-        irdl.operation @bv.xor {
-            %bv = irdl.base "!smt.bv"
-            irdl.operands(lhs: %bv, rhs: %bv)
-            irdl.results(result: %bv)
-        }
+        // irdl.operation @bv.xor {
+        //     %bv = irdl.base "!smt.bv"
+        //     irdl.operands(lhs: %bv, rhs: %bv)
+        //     irdl.results(result: %bv)
+        // }
     }
 }
