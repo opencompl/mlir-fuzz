@@ -10,5 +10,6 @@ add_mlir_library(MLIRFuzzLib
   IRDLUtils.cpp
   GeneratorInfo.cpp
   CLITool.cpp
+  SubPattern.cpp
 )
 target_link_libraries(MLIRFuzzLib PRIVATE ${LIBS})
