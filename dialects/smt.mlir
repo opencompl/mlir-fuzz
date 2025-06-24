@@ -54,19 +54,19 @@ module {
             irdl.results(result: %bool)
         }
 
-        irdl.operation @add {
+        irdl.operation @bv.add {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_and {
+        irdl.operation @bv.and {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_ashr {
+        irdl.operation @bv.ashr {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
@@ -80,31 +80,31 @@ module {
 
         // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvextract-mlirsmtextractop.
 
-        irdl.operation @bv_lshr {
+        irdl.operation @bv.lshr {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_mul {
+        irdl.operation @bv.mul {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_neg {
+        irdl.operation @bv.neg {
             %bv = irdl.base "!smt.bv"
             irdl.operands(input: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_not {
+        irdl.operation @bv.not {
             %bv = irdl.base "!smt.bv"
             irdl.operands(input: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_or {
+        irdl.operation @bv.or {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
@@ -112,43 +112,43 @@ module {
 
         // TODO: https://mlir.llvm.org/docs/Dialects/SMT/#smtbvrepeat-mlirsmtrepeatop
 
-        irdl.operation @bv_sdiv {
+        irdl.operation @bv.sdiv {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_shl {
+        irdl.operation @bv.shl {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_smod {
+        irdl.operation @bv.smod {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_srem {
+        irdl.operation @bv.srem {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_udiv {
+        irdl.operation @bv.udiv {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_urem {
+        irdl.operation @bv.urem {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
         }
 
-        irdl.operation @bv_xor {
+        irdl.operation @bv.xor {
             %bv = irdl.base "!smt.bv"
             irdl.operands(lhs: %bv, rhs: %bv)
             irdl.results(result: %bv)
