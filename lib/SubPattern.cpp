@@ -7,6 +7,9 @@ bool match(Value lhs, Value rhs, std::vector<Value> &mapping) {
   if (lhs == rhs)
     return true;
 
+  if (lhs.getType() != rhs.getType())
+    return false;
+
   // Every value can match a block argument (a free variable).
   // If we try to match against a block argument twice, we check that
   // both values we tried to match are equal.
