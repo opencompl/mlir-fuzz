@@ -97,11 +97,11 @@ module {
         //     irdl.results(result: %bv)
         // }
 
-        // irdl.operation @bv.mul {
-        //     %bv = irdl.base "!smt.bv"
-        //     irdl.operands(lhs: %bv, rhs: %bv)
-        //     irdl.results(result: %bv)
-        // }
+        irdl.operation @bv.mul {
+            %bv = irdl.base "!smt.bv"
+            irdl.operands(lhs: %bv, rhs: %bv)
+            irdl.results(result: %bv)
+        }
 
         // irdl.operation @bv.neg {
         //     %bv = irdl.base "!smt.bv"
@@ -109,11 +109,11 @@ module {
         //     irdl.results(result: %bv)
         // }
 
-        // irdl.operation @bv.not {
-        //     %bv = irdl.base "!smt.bv"
-        //     irdl.operands(input: %bv)
-        //     irdl.results(result: %bv)
-        // }
+        irdl.operation @bv.not {
+            %bv = irdl.base "!smt.bv"
+            irdl.operands(input: %bv)
+            irdl.results(result: %bv)
+        }
 
         irdl.operation @bv.or {
             %bv = irdl.base "!smt.bv"
