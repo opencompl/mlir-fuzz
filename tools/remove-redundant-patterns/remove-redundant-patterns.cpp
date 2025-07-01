@@ -48,28 +48,49 @@ int main(int argc, char **argv) {
   if (!input)
     return 1;
 
-  auto &module = input.value();
-  std::vector<FuncOp> funcs;
-  for (auto &op : (*module)->getRegion(0).front())
-    funcs.push_back(cast<FuncOp>(op.getRegion(0).front().front()));
+  auto &mainModule = input.value();
+  auto canonicalModule =
+      cast<ModuleOp>((*mainModule)->getRegion(0).front().front());
 
-  std::vector<bool> isIllegal(funcs.size(), false);
-  for (int i = funcs.size() - 1; i >= 0; i--) {
-    if (isIllegal[i])
-      continue;
-    for (int j = 0; (size_t)j < funcs.size(); ++j) {
-      if (isIllegal[j])
-        continue;
-      if (i == j)
-        continue;
-      if (isSubPattern(funcs[j], funcs[i])) {
+  std::vector<FuncOp> canonicalFuncs;
+  for (auto &op : canonicalModule.getRegion().front())
+    canonicalFuncs.push_back(cast<FuncOp>(op.getRegion(0).front().front()));
+
+  auto illegalModule =
+      cast<ModuleOp>((*mainModule)->getRegion(0).front().back());
+  std::vector<FuncOp> illegalFuncs;
+  for (auto &op : illegalModule.getRegion().front())
+    illegalFuncs.push_back(cast<FuncOp>(op.getRegion(0).front().front()));
+
+  std::vector<bool> isIllegal(illegalFuncs.size(), false);
+
+  // Remove illegal patterns that are sub-patterns of canonical patterns.
+  for (size_t i = 0; i < illegalFuncs.size(); i++) {
+    for (size_t j = 0; j < canonicalFuncs.size(); j++) {
+      if (isSubPattern(illegalFuncs[i], canonicalFuncs[j])) {
         isIllegal[i] = true;
         break;
       }
     }
   }
 
-  for (size_t i = 0; i < funcs.size(); i++) {
+  // Remove redundant illegal patterns.
+  for (int i = illegalFuncs.size() - 1; i >= 0; i--) {
+    if (isIllegal[i])
+      continue;
+    for (int j = 0; (size_t)j < illegalFuncs.size(); ++j) {
+      if (isIllegal[j])
+        continue;
+      if (i == j)
+        continue;
+      if (isSubPattern(illegalFuncs[j], illegalFuncs[i])) {
+        isIllegal[i] = true;
+        break;
+      }
+    }
+  }
+
+  for (size_t i = 0; i < illegalFuncs.size(); i++) {
     if (isIllegal[i]) {
       llvm::outs() << "true" << "\n";
     } else {
