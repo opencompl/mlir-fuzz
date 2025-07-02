@@ -103,6 +103,13 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Allow unused arguments in the generated functions"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<std::string> buildingBlocks(
+      "building-blocks",
+      llvm::cl::desc("If provided and non-empty, construct new programs by "
+                     "combining the programs from the provided file instead of "
+                     "by using all the available operations."),
+      llvm::cl::init(""));
+
   static llvm::cl::opt<std::string> excludeSubpatterns(
       "exclude-subpatterns",
       llvm::cl::desc("Do not emmit programs that contain patterns from the "
@@ -169,76 +176,133 @@ int main(int argc, char **argv) {
   // Get the dialects.
   auto &dialects = optDialects.value();
 
-  // Get the list of operations we support.
-  std::vector<OperationOp> availableOps = {};
-  dialects->walk(
-      [&availableOps](OperationOp op) { availableOps.push_back(op); });
+  std::function<OwningOpRef<ModuleOp>(MLIRContext &, tree_guide::Chooser *,
+                                      int)>
+      programCreator;
+  if (buildingBlocks.empty()) {
+    // Get the list of operations we support.
+    std::vector<OperationOp> availableOps = {};
+    dialects->walk(
+        [&availableOps](OperationOp op) { availableOps.push_back(op); });
 
-  StringRef constantName = "";
-  dialects->walk([&constantName](DialectOp op) {
-    if (op.getName() == "arith") {
-      constantName = "arith.constant";
-      return WalkResult::interrupt();
-    }
-    if (op.getName() == "comb") {
-      constantName = "hw.constant";
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
+    StringRef constantName = "";
+    dialects->walk([&constantName](DialectOp op) {
+      if (op.getName() == "arith") {
+        constantName = "arith.constant";
+        return WalkResult::interrupt();
+      }
+      if (op.getName() == "comb") {
+        constantName = "hw.constant";
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
 
-  bool noConstantsBool = noConstants;
-  auto createValueOutOfThinAir = [&smtBvWidths, constantName, noConstantsBool](
-                                     GeneratorInfo &info,
-                                     Type type) -> std::optional<Value> {
-    auto *ctx = info.builder.getContext();
-    auto func = llvm::cast<mlir::func::FuncOp>(
-        *info.builder.getInsertionBlock()->getParentOp());
-    if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
-        (noConstantsBool || info.chooser->choose(2) == 0))
+    bool noConstantsBool = noConstants;
+    auto createValueOutOfThinAir =
+        [&smtBvWidths, constantName, noConstantsBool](
+            GeneratorInfo &info, Type type) -> std::optional<Value> {
+      auto *ctx = info.builder.getContext();
+      auto func = llvm::cast<mlir::func::FuncOp>(
+          *info.builder.getInsertionBlock()->getParentOp());
+      if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
+          (noConstantsBool || info.chooser->choose(2) == 0))
+        return info.addFunctionArgument(type);
+
+      if (configuration == Configuration::SMT &&
+          mlir::isa<smt::BoolType>(type)) {
+        bool value = (info.chooser->choose(2) == 0);
+        auto op = info.builder.create<smt::BoolConstantOp>(UnknownLoc::get(ctx),
+                                                           value);
+        return op.getResult();
+      }
+
+      if (configuration == Configuration::SMT &&
+          mlir::isa<smt::BitVectorType>(type)) {
+        unsigned width = smtBvWidths[info.chooser->choose(smtBvWidths.size())];
+        // Only enumerate 0 and 1 for now.
+        uint64_t value = info.chooser->choose(2);
+        auto op = info.builder.create<smt::BVConstantOp>(UnknownLoc::get(ctx),
+                                                         value, width);
+        return op.getResult();
+      }
+
+      if (!noConstantsBool && constantName != "") {
+        if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
+          auto value =
+              IntegerAttr::get(type, info.chooser->chooseUnimportant());
+
+          OperationState state(
+              UnknownLoc::get(ctx), constantName, {}, {type},
+              {NamedAttribute(StringAttr::get(ctx, "value"), value)});
+          auto op = info.builder.create(state);
+          return op->getResult(0);
+        }
+      }
+
+      auto &domValues = info.dominatingValues[type];
+
+      if (domValues.size()) {
+        auto [value, valueIndex] = info.getValue(type);
+        assert(value && "Error in generator logic");
+        return *value;
+      }
+
       return info.addFunctionArgument(type);
+    };
 
-    if (configuration == Configuration::SMT && mlir::isa<smt::BoolType>(type)) {
-      bool value = (info.chooser->choose(2) == 0);
-      auto op =
-          info.builder.create<smt::BoolConstantOp>(UnknownLoc::get(ctx), value);
-      return op.getResult();
+    programCreator = [availableOps, smtBvWidths, createValueOutOfThinAir](
+                         MLIRContext &ctx, tree_guide::Chooser *chooser,
+                         int seed) {
+      return createProgram(
+          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          getAvailableAttributes(ctx, configuration), chooser, maxNumOps,
+          maxNumArgs, seed, createValueOutOfThinAir);
+    };
+  } else {
+    std::ifstream f(buildingBlocks);
+    if (!f.is_open()) {
+      llvm::errs() << "Unable to open file " << buildingBlocks << "\n";
+      std::exit(1);
     }
-
-    if (configuration == Configuration::SMT &&
-        mlir::isa<smt::BitVectorType>(type)) {
-      unsigned width = smtBvWidths[info.chooser->choose(smtBvWidths.size())];
-      // Only enumerate 0 and 1 for now.
-      uint64_t value = info.chooser->choose(2);
-      auto op = info.builder.create<smt::BVConstantOp>(UnknownLoc::get(ctx),
-                                                       value, width);
-      return op.getResult();
-    }
-
-    if (!noConstantsBool && constantName != "") {
-      if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
-        auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
-
-        OperationState state(
-            UnknownLoc::get(ctx), constantName, {}, {type},
-            {NamedAttribute(StringAttr::get(ctx, "value"), value)});
-        auto op = info.builder.create(state);
-        return op->getResult(0);
+    std::vector<std::vector<ModuleOp>> blocks;
+    std::vector<ModuleOp> lastBlocks;
+    std::string program;
+    std::string line;
+    while (std::getline(f, line)) {
+      if (line == "// +++++") {
+        if (lastBlocks.empty()) {
+          llvm::errs() << "No building block for some size.\n";
+          std::exit(1);
+        }
+        blocks.push_back(lastBlocks);
+        lastBlocks = std::vector<ModuleOp>();
+      } else if (line == "// -----") {
+        auto config(&ctx);
+        auto parsedModule = parseSourceString<ModuleOp>(program, config);
+        if (!parsedModule) {
+          llvm::errs() << "Unable to parse this illegal sub-pattern:\n"
+                       << program;
+          std::exit(1);
+        }
+        auto module = parsedModule.release();
+        module.getOperation()->remove();
+        lastBlocks.push_back(module);
+        program = "";
+      } else {
+        program += line;
+        program += "\n";
       }
     }
 
-    auto &domValues = info.dominatingValues[type];
+    programCreator = [blocks](MLIRContext &ctx, tree_guide::Chooser *chooser,
+                              int seed) {
+      return createProgramWithBuildingBlocks(ctx, blocks, chooser, maxNumOps,
+                                             maxNumArgs, seed);
+    };
+  }
 
-    if (domValues.size()) {
-      auto [value, valueIndex] = info.getValue(type);
-      assert(value && "Error in generator logic");
-      return *value;
-    }
-
-    return info.addFunctionArgument(type);
-  };
-
-  // Get the list of illegal subpatterns.
+  // Get the list of illegal sub-patterns.
   RewritePatternSet illegals(&ctx);
   if (excludeSubpatterns != "/dev/null") {
     std::ifstream f(excludeSubpatterns);
@@ -295,10 +359,7 @@ int main(int argc, char **argv) {
   }
 
   while (auto chooser = makeChooser()) {
-    auto module = createProgram(
-        ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
-        getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
-        maxNumArgs, correctProgramCounter, createValueOutOfThinAir);
+    auto module = programCreator(ctx, chooser.get(), correctProgramCounter);
 
     if (!module)
       continue;

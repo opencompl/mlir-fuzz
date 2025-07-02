@@ -146,4 +146,11 @@ mlir::OwningOpRef<mlir::ModuleOp> createProgram(
     tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
     GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir = nullptr);
 
+/// Create a random program from the provided building blocks, given the
+/// decisions taken from chooser.
+mlir::OwningOpRef<mlir::ModuleOp> createProgramWithBuildingBlocks(
+    mlir::MLIRContext &ctx,
+    std::vector<std::vector<mlir::ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed);
+
 #endif // MLIR_FUZZ_GENERATOR_INFO_H

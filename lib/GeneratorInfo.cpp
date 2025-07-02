@@ -10,8 +10,11 @@
 #include "IRDLUtils.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
-#include <unordered_set>
+#include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
 
 using namespace mlir;
 using namespace mlir::irdl;
@@ -395,6 +398,99 @@ OwningOpRef<ModuleOp> createProgram(
     return nullptr;
   builder.create<func::ReturnOp>(unknownLoc, *root);
   func.insertResult(0, root->getType(), {});
+
+  return module;
+}
+
+mlir::Value
+createValueWithBuildingBlocks(MLIRContext &ctx,
+                              std::vector<std::vector<ModuleOp>> buildingBlocks,
+                              tree_guide::Chooser *chooser, func::FuncOp func,
+                              Type type, int numOps, int numArgs);
+
+Value createValueUsingABuildingBlock(
+    MLIRContext &ctx, std::vector<std::vector<ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, func::FuncOp func, int numOps, int numArgs) {
+  int maxAllowedSize = std::min(numOps, ((int)buildingBlocks.size()) - 1);
+  if (maxAllowedSize < 0) {
+    llvm::errs() << "Unexpected error: max allowed size is " << maxAllowedSize
+                 << "\n";
+    std::exit(1);
+  }
+  int rootSize = chooser->choose(maxAllowedSize + 1);
+  auto root = buildingBlocks[rootSize]
+                            [chooser->choose(buildingBlocks[rootSize].size())];
+  func::FuncOp rootFunc =
+      mlir::cast<func::FuncOp>(root->getRegion(0).front().front().clone());
+
+  IRMapping mapping;
+  for (auto argument : rootFunc.getArguments()) {
+    auto value = createValueWithBuildingBlocks(ctx, buildingBlocks, chooser,
+                                               func, argument.getType(),
+                                               numOps - rootSize, numArgs);
+    mapping.map(argument, value);
+  }
+
+  OperandRange outs =
+      mlir::cast<func::ReturnOp>(rootFunc.getBody().front().back())
+          ->getOperands();
+  if (outs.empty()) {
+    llvm::errs() << "Building block returns no value.\n";
+    std::exit(1);
+  }
+
+  Value result = outs[chooser->choose(outs.size())];
+  result.getParentRegion()->cloneInto(&func.getRegion(), mapping);
+  return mapping.lookup(result);
+}
+
+Value createValueWithBuildingBlocks(
+    MLIRContext &ctx, std::vector<std::vector<ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, func::FuncOp func, Type type, int numOps,
+    int numArgs) {
+  if (chooser->choose(2) == 0) {
+    std::vector<BlockArgument> possibleArguments;
+    for (auto arg : func.getArguments()) {
+      if (arg.getType() == type) {
+        possibleArguments.push_back(arg);
+      }
+    }
+    if (!possibleArguments.empty() && chooser->choose(2) == 0) {
+      return possibleArguments[chooser->choose(possibleArguments.size())];
+    }
+    unsigned int position = func.getNumArguments();
+    func.insertArgument(position, type, {}, UnknownLoc::get(&ctx));
+    return func.getArgument(position);
+  }
+
+  return createValueUsingABuildingBlock(ctx, buildingBlocks, chooser, func,
+                                        numOps, numArgs);
+}
+
+OwningOpRef<ModuleOp> createProgramWithBuildingBlocks(
+    MLIRContext &ctx, std::vector<std::vector<ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed) {
+  // Create an empty module.
+  auto unknownLoc = UnknownLoc::get(&ctx);
+  OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
+
+  // Create the builder, and set its insertion point in the module.
+  OpBuilder builder(&ctx);
+  auto &moduleBlock = module->getRegion().getBlocks().front();
+  builder.setInsertionPoint(&moduleBlock, moduleBlock.begin());
+
+  // Create an empty function, and set the insertion point in it.
+  auto func = builder.create<func::FuncOp>(unknownLoc, "main",
+                                           FunctionType::get(&ctx, {}, {}));
+  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
+  auto &funcBlock = func.getBody().emplaceBlock();
+  builder.setInsertionPoint(&funcBlock, funcBlock.begin());
+
+  auto value = createValueUsingABuildingBlock(ctx, buildingBlocks, chooser,
+                                              func, numOps, numArgs);
+  builder.create<func::ReturnOp>(unknownLoc, value);
+
+  func.insertResult(0, value.getType(), {});
 
   return module;
 }
