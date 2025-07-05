@@ -1,6 +1,7 @@
 #include "CLITool.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SMT/IR/SMTDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/IR/Builders.h"
@@ -58,9 +59,19 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
                 &ctx, arith::IntegerOverflowFlags::nsw |
                           arith::IntegerOverflowFlags::nuw)};
   case Configuration::SMT:
-    return {builder.getUnitAttr(),
-            IntegerAttr::get(builder.getIntegerType(1), -1),
-            IntegerAttr::get(builder.getIntegerType(1), 0)};
+    return {
+        builder.getUnitAttr(),
+        IntegerAttr::get(builder.getIntegerType(1), -1),
+        IntegerAttr::get(builder.getIntegerType(1), 0),
+        builder.getI64IntegerAttr(0),
+        builder.getI64IntegerAttr(1),
+        builder.getI64IntegerAttr(2),
+        builder.getI64IntegerAttr(3),
+        builder.getI64IntegerAttr(4),
+        builder.getI64IntegerAttr(5),
+        builder.getI64IntegerAttr(6),
+        builder.getI64IntegerAttr(7),
+    };
   }
   llvm_unreachable("Unknown configuration");
 }
