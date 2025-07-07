@@ -325,9 +325,6 @@ int main(int argc, char **argv) {
         module.getOperation()->remove();
 
         PDLPatternModule pdlPattern(module);
-        pdlPattern.registerRewriteFunction(
-            "rewriter",
-            [](PatternRewriter &rewriter, Operation *root) { /* Empty */ });
         illegals.add(std::move(pdlPattern));
         pattern = "";
       } else {
