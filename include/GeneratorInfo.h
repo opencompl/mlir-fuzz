@@ -150,6 +150,9 @@ mlir::OwningOpRef<mlir::ModuleOp> createProgram(
 /// decisions taken from chooser.
 mlir::OwningOpRef<mlir::ModuleOp> createProgramWithBuildingBlocks(
     mlir::MLIRContext &ctx,
+    mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+    mlir::ArrayRef<mlir::Type> availableTypes,
+    mlir::ArrayRef<mlir::Attribute> availableAttributes,
     std::vector<std::vector<mlir::ModuleOp>> buildingBlocks,
     tree_guide::Chooser *chooser, int numOps, int numArgs, int seed);
 

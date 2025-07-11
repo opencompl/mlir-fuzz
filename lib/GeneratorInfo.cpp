@@ -467,8 +467,54 @@ Value createValueWithBuildingBlocks(
                                         numOps, numArgs);
 }
 
+func::FuncOp getFuncFromModule(ModuleOp module) {
+  if (module.getOps<func::FuncOp>().empty()) {
+    llvm::errs() << "Module does not contain a function.\n";
+    std::exit(1);
+  }
+  return *module.getOps<func::FuncOp>().begin();
+}
+
+Value inlineFunction(func::FuncOp func, mlir::ArrayRef<mlir::Value> values,
+                     OpBuilder &builder) {
+  Block &block = func.getBody().front();
+  // Clone the block at the insertion point.
+  IRMapping mapping;
+  for (auto [arg, value] : llvm::zip(func.getArguments(), values))
+    mapping.map(arg, value);
+  for (auto &op : block.without_terminator())
+    builder.clone(op, mapping);
+  return mapping.lookup(
+      cast<func::ReturnOp>(block.getTerminator()).getOperand(0));
+}
+
+Value getFunctionArgument(func::FuncOp func,
+                          mlir::ArrayRef<mlir::Value> illegalArgs,
+                          tree_guide::Chooser *chooser, int numArgs,
+                          Type type) {
+  std::vector<Value> options;
+  for (auto arg : func.getArguments()) {
+    if (arg.getType() == type &&
+        std::find(illegalArgs.begin(), illegalArgs.end(), arg) ==
+            illegalArgs.end())
+      options.push_back(arg);
+  }
+  if (options.size() == 0 || (func.getNumArguments() < (unsigned int)numArgs &&
+                              chooser->choose(2) == 0)) {
+    func.insertArgument(func.getNumArguments(), type, {},
+                        UnknownLoc::get(func.getContext()));
+    return func.getArgument(func.getNumArguments() - 1);
+  }
+
+  return options[chooser->choose(options.size())];
+}
+
 OwningOpRef<ModuleOp> createProgramWithBuildingBlocks(
-    MLIRContext &ctx, std::vector<std::vector<ModuleOp>> buildingBlocks,
+    mlir::MLIRContext &ctx,
+    mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+    mlir::ArrayRef<mlir::Type> availableTypes,
+    mlir::ArrayRef<mlir::Attribute> availableAttributes,
+    std::vector<std::vector<mlir::ModuleOp>> buildingBlocks,
     tree_guide::Chooser *chooser, int numOps, int numArgs, int seed) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
@@ -486,11 +532,72 @@ OwningOpRef<ModuleOp> createProgramWithBuildingBlocks(
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
-  auto value = createValueUsingABuildingBlock(ctx, buildingBlocks, chooser,
-                                              func, numOps, numArgs);
-  builder.create<func::ReturnOp>(unknownLoc, value);
+  // Generate the toplevel operation
+  auto resultType = availableTypes[chooser->choose(availableTypes.size())];
+  GeneratorInfo info(chooser, builder, availableOps, availableTypes,
+                     availableAttributes, numArgs);
+  auto operations = info.getOperationsWithResultType(resultType);
+  if (operations.empty())
+    return nullptr;
+  auto [op, possibleResults] = operations[chooser->choose(operations.size())];
+  size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];
+  assert(resultIdx == 0);
+  numOps -= 1;
 
-  func.insertResult(0, value.getType(), {});
+  auto [constraints, valueToIdx] = getOperationVerifier(op);
+  auto verifier = ConstraintVerifier(constraints);
+
+  std::vector<Value> operands;
+  std::vector<Value> operandConstraints = getOperandsConstraints(op);
+  for (auto [operandIdx, operand] : llvm::enumerate(operandConstraints)) {
+    auto satisfyingTypes =
+        getSatisfyingTypes(ctx, valueToIdx[operand], verifier, availableTypes);
+    if (satisfyingTypes.empty())
+      return nullptr;
+
+    auto type = satisfyingTypes[chooser->choose(satisfyingTypes.size())];
+    auto succeeded =
+        verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
+    assert(succeeded.succeeded());
+
+    // Collect the operand size
+    int operandSize;
+    if (operandIdx == operandConstraints.size() - 1) {
+      operandSize = numOps;
+    } else {
+      operandSize = chooser->choose(numOps + 1);
+    }
+    numOps -= operandSize;
+
+    // Get the operand block
+    func::FuncOp operandBlock = getFuncFromModule(
+        buildingBlocks[operandSize]
+                      [chooser->choose(buildingBlocks[operandSize].size())]);
+    if (operandBlock.getResultTypes().size() != 1 ||
+        operandBlock.getResultTypes()[0] != type) {
+      return nullptr;
+    }
+
+    std::vector<Value> blockValues;
+    for (auto arg : operandBlock.getArguments()) {
+      auto blockVal = getFunctionArgument(func, blockValues, chooser, numArgs,
+                                          arg.getType());
+      blockValues.push_back(blockVal);
+    }
+
+    operands.push_back(inlineFunction(operandBlock, blockValues, builder));
+  }
+  std::vector<Type> resultTypes = {resultType};
+
+  StringRef dialectName = op.getParentOp().getName();
+  StringRef opSuffix = op.getNameAttr().getValue();
+  StringAttr opName = StringAttr::get(&ctx, dialectName + "." + opSuffix);
+
+  // Create the operation.
+  auto *operation =
+      builder.create(UnknownLoc::get(&ctx), opName, operands, resultTypes);
+  builder.create<func::ReturnOp>(unknownLoc, operation->getResult(0));
+  func.insertResult(0, operation->getResult(0).getType(), {});
 
   return module;
 }

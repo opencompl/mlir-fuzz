@@ -179,12 +179,12 @@ int main(int argc, char **argv) {
   std::function<OwningOpRef<ModuleOp>(MLIRContext &, tree_guide::Chooser *,
                                       int)>
       programCreator;
+  std::vector<OperationOp> availableOps = {};
+  dialects->walk(
+      [&availableOps](OperationOp op) { availableOps.push_back(op); });
+
   if (buildingBlocks.empty()) {
     // Get the list of operations we support.
-    std::vector<OperationOp> availableOps = {};
-    dialects->walk(
-        [&availableOps](OperationOp op) { availableOps.push_back(op); });
-
     StringRef constantName = "";
     dialects->walk([&constantName](DialectOp op) {
       if (op.getName() == "arith") {
@@ -295,10 +295,12 @@ int main(int argc, char **argv) {
       }
     }
 
-    programCreator = [blocks](MLIRContext &ctx, tree_guide::Chooser *chooser,
-                              int seed) {
-      return createProgramWithBuildingBlocks(ctx, blocks, chooser, maxNumOps,
-                                             maxNumArgs, seed);
+    programCreator = [=](MLIRContext &ctx, tree_guide::Chooser *chooser,
+                         int seed) {
+      return createProgramWithBuildingBlocks(
+          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          getAvailableAttributes(ctx, configuration), blocks, chooser,
+          maxNumOps, maxNumArgs, seed);
     };
   }
 
