@@ -90,9 +90,18 @@ int main(int argc, char **argv) {
           "Maximum number of verified programs to generate, -1 for infinite"),
       llvm::cl::init(-1));
 
-  static llvm::cl::opt<bool> noConstants(
-      "no-constants", llvm::cl::desc("Do not generate constants"),
-      llvm::cl::init(false));
+  enum class ConstantKind { None, Constant, Synth };
+
+  static llvm::cl::opt<ConstantKind> constantKind(
+      "constant-kind", llvm::cl::desc("What kind of constants to generate"),
+      llvm::cl::init(ConstantKind::Constant),
+      llvm::cl::values(
+          clEnumValN(ConstantKind::None, "none", "no constants"),
+          clEnumValN(ConstantKind::Constant, "constant",
+                     "Generate only the specified constants"),
+          clEnumValN(
+              ConstantKind::Synth, "synth",
+              "Generate a synth.constant operation instead of constants")));
 
   static llvm::cl::opt<int> seed(
       "seed", llvm::cl::desc("Specify random seed used in generation"),
@@ -198,16 +207,22 @@ int main(int argc, char **argv) {
       return WalkResult::advance();
     });
 
-    bool noConstantsBool = noConstants;
     auto createValueOutOfThinAir =
-        [&smtBvWidths, constantName, noConstantsBool](
-            GeneratorInfo &info, Type type) -> std::optional<Value> {
+        [&smtBvWidths, constantName](GeneratorInfo &info,
+                                     Type type) -> std::optional<Value> {
       auto *ctx = info.builder.getContext();
       auto func = llvm::cast<mlir::func::FuncOp>(
           *info.builder.getInsertionBlock()->getParentOp());
       if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
-          (noConstantsBool || info.chooser->choose(2) == 0))
+          (constantKind == ConstantKind::None || info.chooser->choose(2) == 0))
         return info.addFunctionArgument(type);
+
+      if (constantKind == ConstantKind::Synth) {
+        auto *op = info.builder.create(UnknownLoc::get(ctx),
+                                       StringAttr::get(ctx, "synth.constant"),
+                                       {}, {type});
+        return op->getResult(0);
+      }
 
       if (configuration == Configuration::SMT &&
           mlir::isa<smt::BoolType>(type)) {
@@ -227,7 +242,7 @@ int main(int argc, char **argv) {
         return op.getResult();
       }
 
-      if (!noConstantsBool && constantName != "") {
+      if (constantKind != ConstantKind::None && constantName != "") {
         if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
           auto value =
               IntegerAttr::get(type, info.chooser->chooseUnimportant());
