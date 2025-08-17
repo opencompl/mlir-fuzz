@@ -384,7 +384,6 @@ OwningOpRef<ModuleOp> createProgram(
   // Create an empty function, and set the insertion point in it.
   auto func = builder.create<func::FuncOp>(unknownLoc, "main",
                                            FunctionType::get(&ctx, {}, {}));
-  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
@@ -528,7 +527,6 @@ OwningOpRef<ModuleOp> createProgramWithBuildingBlocks(
   // Create an empty function, and set the insertion point in it.
   auto func = builder.create<func::FuncOp>(unknownLoc, "main",
                                            FunctionType::get(&ctx, {}, {}));
-  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 

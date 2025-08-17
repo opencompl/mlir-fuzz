@@ -367,7 +367,7 @@ int main(int argc, char **argv) {
       return guide->makeChooser();
     };
   } else if (strategy == Strategy::BFS) {
-    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>(seed)}]() {
+    makeChooser = [guide{std::make_shared<tree_guide::EnumeratingGuide>()}]() {
       return guide->makeChooser();
     };
   }
