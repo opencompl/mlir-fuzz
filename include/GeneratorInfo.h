@@ -125,15 +125,15 @@ struct GeneratorInfo {
   /// Return the operation created
   /// This function is used inside of addRootedOperation
   mlir::Operation *createOperation(mlir::irdl::OperationOp op,
-                                   mlir::Type resultType, int resultIdx,
-                                   int fuel);
+                                   mlir::Type resultType, size_t resultIdx,
+                                   int fuel, bool exactSize = false);
 
   /// Add an operation with a given result type.
   /// Return the result that has has the requested type and the index of that
   /// value if it has zero cost. This function will also create a number
   /// proportional to `fuel` operations.
   std::pair<std::optional<mlir::Value>, int>
-  addRootedOperation(mlir::Type resultType, int fuel);
+  addRootedOperation(mlir::Type resultType, int fuel, bool exactSize = false);
 };
 
 /// Create a random program, given the decisions taken from chooser.
@@ -144,6 +144,17 @@ mlir::OwningOpRef<mlir::ModuleOp> createProgram(
     mlir::ArrayRef<mlir::Type> availableTypes,
     mlir::ArrayRef<mlir::Attribute> availableAttributes,
     tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
-    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir = nullptr);
+    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir = nullptr,
+    bool exactSize = false);
+
+/// Create a random program from the provided building blocks, given the
+/// decisions taken from chooser.
+mlir::OwningOpRef<mlir::ModuleOp> createProgramWithBuildingBlocks(
+    mlir::MLIRContext &ctx,
+    mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+    mlir::ArrayRef<mlir::Type> availableTypes,
+    mlir::ArrayRef<mlir::Attribute> availableAttributes,
+    std::vector<std::vector<mlir::ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed);
 
 #endif // MLIR_FUZZ_GENERATOR_INFO_H

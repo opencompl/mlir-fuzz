@@ -7,20 +7,29 @@
 //===----------------------------------------------------------------------===//
 
 #include <cmath>
+#include <fstream>
 #include <vector>
 
 #include "CLITool.h"
 #include "GeneratorInfo.h"
 #include "IRDLUtils.h"
 
+#include "mlir/Conversion/PDLToPDLInterp/PDLToPDLInterp.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -54,6 +63,13 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Maximum number of non-constant operations"),
       llvm::cl::init(3));
 
+  // Number of non-constant operations to be printed.
+  static llvm::cl::opt<bool> exactSize(
+      "exact-size",
+      llvm::cl::desc(
+          "Should the generated programs have exactly max-num-ops operations"),
+      llvm::cl::init(false));
+
   // Maximum number of arguments to be added per function.
   static llvm::cl::opt<int> maxNumArgs(
       "max-num-args",
@@ -81,9 +97,18 @@ int main(int argc, char **argv) {
           "Maximum number of verified programs to generate, -1 for infinite"),
       llvm::cl::init(-1));
 
-  static llvm::cl::opt<bool> noConstants(
-      "no-constants", llvm::cl::desc("Do not generate constants"),
-      llvm::cl::init(false));
+  enum class ConstantKind { None, Constant, Synth };
+
+  static llvm::cl::opt<ConstantKind> constantKind(
+      "constant-kind", llvm::cl::desc("What kind of constants to generate"),
+      llvm::cl::init(ConstantKind::Constant),
+      llvm::cl::values(
+          clEnumValN(ConstantKind::None, "none", "no constants"),
+          clEnumValN(ConstantKind::Constant, "constant",
+                     "Generate only the specified constants"),
+          clEnumValN(
+              ConstantKind::Synth, "synth",
+              "Generate a synth.constant operation instead of constants")));
 
   static llvm::cl::opt<int> seed(
       "seed", llvm::cl::desc("Specify random seed used in generation"),
@@ -94,9 +119,22 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Allow unused arguments in the generated functions"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<std::string> buildingBlocks(
+      "building-blocks",
+      llvm::cl::desc("If provided and non-empty, construct new programs by "
+                     "combining the programs from the provided file instead of "
+                     "by using all the available operations."),
+      llvm::cl::init(""));
+
+  static llvm::cl::opt<std::string> excludeSubpatterns(
+      "exclude-subpatterns",
+      llvm::cl::desc("Do not emmit programs that contain patterns from the "
+                     "provided file"),
+      llvm::cl::init("/dev/null"));
+
   static llvm::cl::opt<bool> cse(
       "cse",
-      llvm::cl::desc("Run cse on the generated program before printing it"),
+      llvm::cl::desc("Run CSE on the generated program before printing it"),
       llvm::cl::init(false));
 
   static llvm::cl::opt<Configuration> configuration(
@@ -118,6 +156,13 @@ int main(int argc, char **argv) {
                                   "dialect"))
                                 );
 
+  static llvm::cl::opt<std::string> bitVectorWidths(
+      "smt-bitvector-widths",
+      llvm::cl::desc("In case the configuration is set to \"smt\", this is a "
+                     "list of comma-separated bitwidths. If not specified, "
+                     "this corresponds to no BitVector instructions."),
+      llvm::cl::init(""));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -127,6 +172,15 @@ int main(int argc, char **argv) {
   // Printing flags
   OpPrintingFlags printingFlags;
   printingFlags.printGenericOpForm(printOpGeneric);
+
+  std::vector<unsigned> smtBvWidths;
+  {
+    std::stringstream ss(bitVectorWidths);
+    std::string width;
+    while (std::getline(ss, width, ',')) {
+      smtBvWidths.push_back(std::stoi(width));
+    }
+  }
 
   // Register all dialects
   DialectRegistry registry;
@@ -142,66 +196,174 @@ int main(int argc, char **argv) {
   // Get the dialects.
   auto &dialects = optDialects.value();
 
-  // Get the list of operations we support.
+  std::function<OwningOpRef<ModuleOp>(MLIRContext &, tree_guide::Chooser *,
+                                      int)>
+      programCreator;
   std::vector<OperationOp> availableOps = {};
   dialects->walk(
       [&availableOps](OperationOp op) { availableOps.push_back(op); });
 
-  StringRef constantName = "";
-  dialects->walk([&constantName](DialectOp op) {
-    if (op.getName() == "arith") {
-      constantName = "arith.constant";
-      return WalkResult::interrupt();
-    }
-    if (op.getName() == "comb") {
-      constantName = "hw.constant";
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
+  if (buildingBlocks.empty()) {
+    // Get the list of operations we support.
+    StringRef constantName = "";
+    dialects->walk([&constantName](DialectOp op) {
+      if (op.getName() == "arith") {
+        constantName = "arith.constant";
+        return WalkResult::interrupt();
+      }
+      if (op.getName() == "comb") {
+        constantName = "hw.constant";
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
 
-  bool noConstantsBool = noConstants;
-  auto createValueOutOfThinAir =
-      [constantName, noConstantsBool](GeneratorInfo &info,
-                                      Type type) -> std::optional<Value> {
-    auto *ctx = info.builder.getContext();
-    auto func = llvm::cast<mlir::func::FuncOp>(
-        *info.builder.getInsertionBlock()->getParentOp());
-    if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
-        (noConstantsBool || info.chooser->choose(2) == 0))
-      return info.addFunctionArgument(type);
+    auto createValueOutOfThinAir =
+        [&smtBvWidths, constantName](GeneratorInfo &info,
+                                     Type type) -> std::optional<Value> {
+      auto *ctx = info.builder.getContext();
+      auto func = llvm::cast<mlir::func::FuncOp>(
+          *info.builder.getInsertionBlock()->getParentOp());
+      if (func.getNumArguments() < (unsigned int)info.maxNumArgs &&
+          (constantKind == ConstantKind::None || info.chooser->choose(2) == 0))
+        return info.addFunctionArgument(type);
 
-    if (configuration == Configuration::SMT && mlir::isa<smt::BoolType>(type)) {
-      bool value = (info.chooser->choose(2) == 0);
-      auto op =
-          info.builder.create<smt::BoolConstantOp>(UnknownLoc::get(ctx), value);
-      return op.getResult();
-    }
-
-    if (!noConstantsBool && constantName != "") {
-      if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
-        auto value = IntegerAttr::get(type, info.chooser->chooseUnimportant());
-
-        OperationState state(
-            UnknownLoc::get(ctx), constantName, {}, {type},
-            {NamedAttribute(StringAttr::get(ctx, "value"), value)});
-        auto op = info.builder.create(state);
+      if (constantKind == ConstantKind::Synth) {
+        auto *op = info.builder.create(UnknownLoc::get(ctx),
+                                       StringAttr::get(ctx, "synth.constant"),
+                                       {}, {type});
         return op->getResult(0);
+      }
+
+      if (configuration == Configuration::SMT &&
+          mlir::isa<smt::BoolType>(type)) {
+        bool value = (info.chooser->choose(2) == 0);
+        auto op = info.builder.create<smt::BoolConstantOp>(UnknownLoc::get(ctx),
+                                                           value);
+        return op.getResult();
+      }
+
+      if (configuration == Configuration::SMT &&
+          mlir::isa<smt::BitVectorType>(type)) {
+        unsigned width = smtBvWidths[info.chooser->choose(smtBvWidths.size())];
+        // Only enumerate 0 and 1 for now.
+        uint64_t value = info.chooser->choose(2);
+        auto op = info.builder.create<smt::BVConstantOp>(UnknownLoc::get(ctx),
+                                                         value, width);
+        return op.getResult();
+      }
+
+      if (constantKind != ConstantKind::None && constantName != "") {
+        if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
+          auto value =
+              IntegerAttr::get(type, info.chooser->chooseUnimportant());
+
+          OperationState state(
+              UnknownLoc::get(ctx), constantName, {}, {type},
+              {NamedAttribute(StringAttr::get(ctx, "value"), value)});
+          auto op = info.builder.create(state);
+          return op->getResult(0);
+        }
+      }
+
+      auto &domValues = info.dominatingValues[type];
+
+      if (domValues.size()) {
+        auto [value, valueIndex] = info.getValue(type);
+        assert(value && "Error in generator logic");
+        return *value;
+      }
+
+      return info.addFunctionArgument(type);
+    };
+
+    programCreator = [availableOps, smtBvWidths, createValueOutOfThinAir](
+                         MLIRContext &ctx, tree_guide::Chooser *chooser,
+                         int seed) {
+      return createProgram(
+          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          getAvailableAttributes(ctx, configuration), chooser, maxNumOps,
+          maxNumArgs, seed, createValueOutOfThinAir, exactSize);
+    };
+  } else {
+    std::ifstream f(buildingBlocks);
+    if (!f.is_open()) {
+      llvm::errs() << "Unable to open file " << buildingBlocks << "\n";
+      std::exit(1);
+    }
+    std::vector<std::vector<ModuleOp>> blocks;
+    std::vector<ModuleOp> lastBlocks;
+    std::string program;
+    std::string line;
+    while (std::getline(f, line)) {
+      if (line == "// +++++") {
+        if (lastBlocks.empty()) {
+          llvm::errs() << "No building block for some size.\n";
+          std::exit(1);
+        }
+        blocks.push_back(lastBlocks);
+        lastBlocks = std::vector<ModuleOp>();
+      } else if (line == "// -----") {
+        auto config(&ctx);
+        auto parsedModule = parseSourceString<ModuleOp>(program, config);
+        if (!parsedModule) {
+          llvm::errs() << "Unable to parse this illegal sub-pattern:\n"
+                       << program;
+          std::exit(1);
+        }
+        auto module = parsedModule.release();
+        module.getOperation()->remove();
+        lastBlocks.push_back(module);
+        program = "";
+      } else {
+        program += line;
+        program += "\n";
       }
     }
 
-    auto &domValues = info.dominatingValues[type];
+    programCreator = [=](MLIRContext &ctx, tree_guide::Chooser *chooser,
+                         int seed) {
+      return createProgramWithBuildingBlocks(
+          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          getAvailableAttributes(ctx, configuration), blocks, chooser,
+          maxNumOps, maxNumArgs, seed);
+    };
+  }
 
-    if (domValues.size()) {
-      auto [value, valueIndex] = info.getValue(type);
-      assert(value && "Error in generator logic");
-      return *value;
+  // Get the list of illegal sub-patterns.
+  RewritePatternSet illegals(&ctx);
+  if (excludeSubpatterns != "/dev/null") {
+    std::ifstream f(excludeSubpatterns);
+    if (!f.is_open()) {
+      llvm::errs() << "Unable to open file " << excludeSubpatterns << "\n";
+      std::exit(1);
     }
+    std::string pattern;
+    std::string line;
+    while (std::getline(f, line)) {
+      if (line == "// -----") {
+        auto config(&ctx);
+        auto parsedModule = parseSourceString<ModuleOp>(pattern, config);
+        if (!parsedModule) {
+          llvm::errs() << "Unable to parse this illegal sub-pattern:\n"
+                       << pattern;
+          std::exit(1);
+        }
+        auto module = parsedModule.release();
+        module.getOperation()->remove();
 
-    return info.addFunctionArgument(type);
-  };
+        PDLPatternModule pdlPattern(module);
+        illegals.add(std::move(pdlPattern));
+        pattern = "";
+      } else {
+        pattern += line;
+        pattern += "\n";
+      }
+    }
+  }
+  FrozenRewritePatternSet frozenIllegals(
+      std::forward<RewritePatternSet>(illegals));
 
-  size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
   // set seed to a random positive integer
@@ -216,18 +378,14 @@ int main(int argc, char **argv) {
       return guide->makeChooser();
     };
   } else if (strategy == Strategy::BFS) {
-    makeChooser = [guide{std::make_shared<tree_guide::BFSGuide>(seed)}]() {
+    makeChooser = [guide{std::make_shared<tree_guide::EnumeratingGuide>()}]() {
       return guide->makeChooser();
     };
   }
 
   while (auto chooser = makeChooser()) {
-    auto module = createProgram(
-        ctx, availableOps, getAvailableTypes(ctx, configuration),
-        getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
-        maxNumArgs, correctProgramCounter, createValueOutOfThinAir);
+    auto module = programCreator(ctx, chooser.get(), correctProgramCounter);
 
-    programCounter += 1;
     if (!module)
       continue;
     // Some programs still won't verify, because IRDL is not expressive enough
@@ -251,9 +409,18 @@ int main(int argc, char **argv) {
         continue;
       }
     }
-    correctProgramCounter += 1;
 
-    // Print the program to stdout.
+    // Make sure the program does not contain an illegal subpattern.
+    if (applyPatternsGreedily(module->getBodyRegion(), frozenIllegals,
+                              {.maxIterations = 1, .maxNumRewrites = 1})
+            .failed()) {
+      // If there is a fail, that means we matched the pattern, and apply the
+      // rewrite (which does nothing). Since the rewrite does nothing, the
+      // pattern continues to match, which causes a failure.
+      continue;
+    }
+
+    correctProgramCounter += 1;
     if (!count) {
       module->print(llvm::outs(), printingFlags);
       llvm::outs() << "// -----\n";

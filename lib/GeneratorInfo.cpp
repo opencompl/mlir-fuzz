@@ -10,8 +10,11 @@
 #include "IRDLUtils.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
-#include <unordered_set>
+#include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
 
 using namespace mlir;
 using namespace mlir::irdl;
@@ -166,7 +169,8 @@ getZeroCostValueWithIndex(GeneratorInfo &info, Type type, int index) {
 
 mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
                                                 mlir::Type resultType,
-                                                int resultIdx, int fuel) {
+                                                size_t resultIdx, int fuel,
+                                                bool exactSize) {
   const static std::string COMMUTATIVITY = "commutativity";
   auto ctx = builder.getContext();
 
@@ -204,7 +208,8 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
         [](mlir::irdl::OperationOp op) { return true; };
 
     // LHS can be generated freely
-    auto [LHSvalue, LHSIsZeroCost] = addRootedOperation(LHStype, LHSfuel);
+    auto [LHSvalue, LHSIsZeroCost] =
+        addRootedOperation(LHStype, LHSfuel, exactSize);
     if (!LHSvalue.has_value()) {
       return nullptr;
     }
@@ -243,7 +248,7 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
           possibleResults[chooser->choose(possibleResults.size())];
 
       mlir::Operation *RHSoperation =
-          createOperation(RHSop, RHStype, RHSresultIdx, RHSfuel - 1);
+          createOperation(RHSop, RHStype, RHSresultIdx, RHSfuel - 1, exactSize);
       if (RHSoperation == nullptr) {
         return nullptr;
       }
@@ -255,7 +260,8 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
     }
     operands.push_back(*RHSvalue);
   } else {
-    for (auto operand : getOperandsConstraints(op)) {
+    std::vector<Value> operandConstraints = getOperandsConstraints(op);
+    for (auto [operandIdx, operand] : llvm::enumerate(operandConstraints)) {
       auto satisfyingTypes = getSatisfyingTypes(*ctx, valueToIdx[operand],
                                                 verifier, availableTypes);
       if (satisfyingTypes.empty())
@@ -266,10 +272,16 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
           verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
       assert(succeeded.succeeded());
 
-      int operandFuel = chooser->choose(fuel + 1);
+      int operandFuel = 0;
+      if (exactSize && (operandIdx == operandConstraints.size() - 1)) {
+        operandFuel = fuel;
+      } else {
+        operandFuel = chooser->choose(fuel + 1);
+      }
       fuel -= operandFuel;
 
-      auto [operandValue, isZeroCost] = addRootedOperation(type, operandFuel);
+      auto [operandValue, isZeroCost] =
+          addRootedOperation(type, operandFuel, exactSize);
       if (!operandValue.has_value())
         return nullptr;
       operands.push_back(*operandValue);
@@ -303,6 +315,10 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
       return nullptr;
 
     auto attr = satisfyingAttrs[chooser->choose(satisfyingAttrs.size())];
+    // HACK: Since irdl doesn't support optional attributes yet, we consider
+    // that all unit attributes are optional, and no other attributes are.
+    if (mlir::isa<UnitAttr>(attr) && chooser->choose(2) == 0)
+      continue;
     auto succeeded = verifier.verify({}, attr, valueToIdx[constraint]);
     assert(succeeded.succeeded());
     attributes.emplace_back(StringAttr::get(ctx, name), attr);
@@ -317,7 +333,7 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
       builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes);
   if (!attributes.empty()) {
     auto propAttr = builder.getDictionaryAttr(attributes);
-    operation->setPropertiesFromAttribute(propAttr, {});
+    assert(operation->setPropertiesFromAttribute(propAttr, {}).succeeded());
   }
   return operation;
 }
@@ -329,12 +345,12 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
 /// index. This function will also create a number of operations less than
 /// `fuel` operations.
 std::pair<std::optional<Value>, int>
-GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
+GeneratorInfo::addRootedOperation(Type resultType, int fuel, bool exactSize) {
 
   // When we don't have fuel anymore, we either use a dominated value,
   // or we create a value out of thin air, which may include adding
   // a new function argument.
-  if (fuel == 0 || chooser->choose(2) == 0)
+  if (fuel == 0 || (!exactSize && chooser->choose(2) == 0))
     return getZeroCostValue(*this, resultType);
 
   // Cost of the current operation being created.
@@ -347,7 +363,8 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
   auto [op, possibleResults] = operations[chooser->choose(operations.size())];
   size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];
 
-  mlir::Operation *operation = createOperation(op, resultType, resultIdx, fuel);
+  mlir::Operation *operation =
+      createOperation(op, resultType, resultIdx, fuel, exactSize);
   if (operation == nullptr) {
     return {};
   }
@@ -360,11 +377,13 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
 
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
-OwningOpRef<ModuleOp> createProgram(
-    MLIRContext &ctx, ArrayRef<OperationOp> availableOps,
-    ArrayRef<Type> availableTypes, ArrayRef<Attribute> availableAttributes,
-    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
-    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir) {
+OwningOpRef<ModuleOp>
+createProgram(MLIRContext &ctx, ArrayRef<OperationOp> availableOps,
+              ArrayRef<Type> availableTypes,
+              ArrayRef<Attribute> availableAttributes,
+              tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
+              GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir,
+              bool exactSize) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -377,7 +396,6 @@ OwningOpRef<ModuleOp> createProgram(
   // Create an empty function, and set the insertion point in it.
   auto func = builder.create<func::FuncOp>(unknownLoc, "main",
                                            FunctionType::get(&ctx, {}, {}));
-  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
   auto &funcBlock = func.getBody().emplaceBlock();
   builder.setInsertionPoint(&funcBlock, funcBlock.begin());
 
@@ -386,11 +404,210 @@ OwningOpRef<ModuleOp> createProgram(
                      availableAttributes, numArgs, createValueOutOfThinAir);
 
   auto type = availableTypes[chooser->choose(availableTypes.size())];
-  auto [root, isZeroCost] = info.addRootedOperation(type, numOps);
+  auto [root, isZeroCost] = info.addRootedOperation(type, numOps, exactSize);
   if (!root.has_value())
     return nullptr;
   builder.create<func::ReturnOp>(unknownLoc, *root);
   func.insertResult(0, root->getType(), {});
+
+  return module;
+}
+
+mlir::Value
+createValueWithBuildingBlocks(MLIRContext &ctx,
+                              std::vector<std::vector<ModuleOp>> buildingBlocks,
+                              tree_guide::Chooser *chooser, func::FuncOp func,
+                              Type type, int numOps, int numArgs);
+
+Value createValueUsingABuildingBlock(
+    MLIRContext &ctx, std::vector<std::vector<ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, func::FuncOp func, int numOps, int numArgs) {
+  int maxAllowedSize = std::min(numOps, ((int)buildingBlocks.size()) - 1);
+  if (maxAllowedSize < 0) {
+    llvm::errs() << "Unexpected error: max allowed size is " << maxAllowedSize
+                 << "\n";
+    std::exit(1);
+  }
+  int rootSize = chooser->choose(maxAllowedSize + 1);
+  auto root = buildingBlocks[rootSize]
+                            [chooser->choose(buildingBlocks[rootSize].size())];
+  func::FuncOp rootFunc =
+      mlir::cast<func::FuncOp>(root->getRegion(0).front().front().clone());
+
+  IRMapping mapping;
+  for (auto argument : rootFunc.getArguments()) {
+    auto value = createValueWithBuildingBlocks(ctx, buildingBlocks, chooser,
+                                               func, argument.getType(),
+                                               numOps - rootSize, numArgs);
+    mapping.map(argument, value);
+  }
+
+  OperandRange outs =
+      mlir::cast<func::ReturnOp>(rootFunc.getBody().front().back())
+          ->getOperands();
+  if (outs.empty()) {
+    llvm::errs() << "Building block returns no value.\n";
+    std::exit(1);
+  }
+
+  Value result = outs[chooser->choose(outs.size())];
+  result.getParentRegion()->cloneInto(&func.getRegion(), mapping);
+  return mapping.lookup(result);
+}
+
+Value createValueWithBuildingBlocks(
+    MLIRContext &ctx, std::vector<std::vector<ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, func::FuncOp func, Type type, int numOps,
+    int numArgs) {
+  if (chooser->choose(2) == 0) {
+    std::vector<BlockArgument> possibleArguments;
+    for (auto arg : func.getArguments()) {
+      if (arg.getType() == type) {
+        possibleArguments.push_back(arg);
+      }
+    }
+    if (!possibleArguments.empty() && chooser->choose(2) == 0) {
+      return possibleArguments[chooser->choose(possibleArguments.size())];
+    }
+    unsigned int position = func.getNumArguments();
+    func.insertArgument(position, type, {}, UnknownLoc::get(&ctx));
+    return func.getArgument(position);
+  }
+
+  return createValueUsingABuildingBlock(ctx, buildingBlocks, chooser, func,
+                                        numOps, numArgs);
+}
+
+func::FuncOp getFuncFromModule(ModuleOp module) {
+  if (module.getOps<func::FuncOp>().empty()) {
+    llvm::errs() << "Module does not contain a function.\n";
+    std::exit(1);
+  }
+  return *module.getOps<func::FuncOp>().begin();
+}
+
+Value inlineFunction(func::FuncOp func, mlir::ArrayRef<mlir::Value> values,
+                     OpBuilder &builder) {
+  Block &block = func.getBody().front();
+  // Clone the block at the insertion point.
+  IRMapping mapping;
+  for (auto [arg, value] : llvm::zip(func.getArguments(), values))
+    mapping.map(arg, value);
+  for (auto &op : block.without_terminator())
+    builder.clone(op, mapping);
+  return mapping.lookup(
+      cast<func::ReturnOp>(block.getTerminator()).getOperand(0));
+}
+
+Value getFunctionArgument(func::FuncOp func,
+                          mlir::ArrayRef<mlir::Value> illegalArgs,
+                          tree_guide::Chooser *chooser, int numArgs,
+                          Type type) {
+  std::vector<Value> options;
+  for (auto arg : func.getArguments()) {
+    if (arg.getType() == type &&
+        std::find(illegalArgs.begin(), illegalArgs.end(), arg) ==
+            illegalArgs.end())
+      options.push_back(arg);
+  }
+  if (options.size() == 0 || (func.getNumArguments() < (unsigned int)numArgs &&
+                              chooser->choose(2) == 0)) {
+    func.insertArgument(func.getNumArguments(), type, {},
+                        UnknownLoc::get(func.getContext()));
+    return func.getArgument(func.getNumArguments() - 1);
+  }
+
+  return options[chooser->choose(options.size())];
+}
+
+OwningOpRef<ModuleOp> createProgramWithBuildingBlocks(
+    mlir::MLIRContext &ctx,
+    mlir::ArrayRef<mlir::irdl::OperationOp> availableOps,
+    mlir::ArrayRef<mlir::Type> availableTypes,
+    mlir::ArrayRef<mlir::Attribute> availableAttributes,
+    std::vector<std::vector<mlir::ModuleOp>> buildingBlocks,
+    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed) {
+  // Create an empty module.
+  auto unknownLoc = UnknownLoc::get(&ctx);
+  OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
+
+  // Create the builder, and set its insertion point in the module.
+  OpBuilder builder(&ctx);
+  auto &moduleBlock = module->getRegion().getBlocks().front();
+  builder.setInsertionPoint(&moduleBlock, moduleBlock.begin());
+
+  // Create an empty function, and set the insertion point in it.
+  auto func = builder.create<func::FuncOp>(unknownLoc, "main",
+                                           FunctionType::get(&ctx, {}, {}));
+  auto &funcBlock = func.getBody().emplaceBlock();
+  builder.setInsertionPoint(&funcBlock, funcBlock.begin());
+
+  // Generate the toplevel operation
+  auto resultType = availableTypes[chooser->choose(availableTypes.size())];
+  GeneratorInfo info(chooser, builder, availableOps, availableTypes,
+                     availableAttributes, numArgs);
+  auto operations = info.getOperationsWithResultType(resultType);
+  if (operations.empty())
+    return nullptr;
+  auto [op, possibleResults] = operations[chooser->choose(operations.size())];
+  size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];
+  assert(resultIdx == 0);
+  numOps -= 1;
+
+  auto [constraints, valueToIdx] = getOperationVerifier(op);
+  auto verifier = ConstraintVerifier(constraints);
+
+  std::vector<Value> operands;
+  std::vector<Value> operandConstraints = getOperandsConstraints(op);
+  for (auto [operandIdx, operand] : llvm::enumerate(operandConstraints)) {
+    auto satisfyingTypes =
+        getSatisfyingTypes(ctx, valueToIdx[operand], verifier, availableTypes);
+    if (satisfyingTypes.empty())
+      return nullptr;
+
+    auto type = satisfyingTypes[chooser->choose(satisfyingTypes.size())];
+    auto succeeded =
+        verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
+    assert(succeeded.succeeded());
+
+    // Collect the operand size
+    int operandSize;
+    if (operandIdx == operandConstraints.size() - 1) {
+      operandSize = numOps;
+    } else {
+      operandSize = chooser->choose(numOps + 1);
+    }
+    numOps -= operandSize;
+
+    // Get the operand block
+    func::FuncOp operandBlock = getFuncFromModule(
+        buildingBlocks[operandSize]
+                      [chooser->choose(buildingBlocks[operandSize].size())]);
+    if (operandBlock.getResultTypes().size() != 1 ||
+        operandBlock.getResultTypes()[0] != type) {
+      return nullptr;
+    }
+
+    std::vector<Value> blockValues;
+    for (auto arg : operandBlock.getArguments()) {
+      auto blockVal = getFunctionArgument(func, blockValues, chooser, numArgs,
+                                          arg.getType());
+      blockValues.push_back(blockVal);
+    }
+
+    operands.push_back(inlineFunction(operandBlock, blockValues, builder));
+  }
+  std::vector<Type> resultTypes = {resultType};
+
+  StringRef dialectName = op.getParentOp().getName();
+  StringRef opSuffix = op.getNameAttr().getValue();
+  StringAttr opName = StringAttr::get(&ctx, dialectName + "." + opSuffix);
+
+  // Create the operation.
+  auto *operation =
+      builder.create(UnknownLoc::get(&ctx), opName, operands, resultTypes);
+  builder.create<func::ReturnOp>(unknownLoc, operation->getResult(0));
+  func.insertResult(0, operation->getResult(0).getType(), {});
 
   return module;
 }

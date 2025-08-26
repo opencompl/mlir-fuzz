@@ -26,7 +26,8 @@ enum class Configuration {
 
 /// Get the types that the fuzzer supports.
 std::vector<mlir::Type> getAvailableTypes(mlir::MLIRContext &ctx,
-                                          Configuration config);
+                                          Configuration config,
+                                          std::vector<unsigned> smtBvWidths);
 
 /// Get the types that the fuzzer supports.
 std::vector<mlir::Attribute> getAvailableAttributes(mlir::MLIRContext &ctx,

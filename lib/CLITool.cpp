@@ -1,8 +1,10 @@
 #include "CLITool.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SMT/IR/SMTDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -11,7 +13,8 @@
 
 using namespace mlir;
 
-std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
+std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
+                                    std::vector<unsigned> smtBvWidths) {
   Builder builder(&ctx);
   switch (config) {
   case Configuration::Arith:
@@ -20,18 +23,23 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config) {
         builder.getIntegerType(1),
         builder.getIntegerType(64),
     };
-  case Configuration::SMT:
-    return {smt::BoolType::get(&ctx)};
   case Configuration::LLVM:
     return {
         builder.getIntegerType(1),
         builder.getIntegerType(32),
         builder.getIntegerType(64),
     };
-
+  case Configuration::SMT: {
+    std::vector<Type> types = {smt::BoolType::get(&ctx)};
+    for (unsigned width : smtBvWidths) {
+      types.push_back(smt::BitVectorType::get(&ctx, width));
+    }
+    return types;
+  }
+}
   llvm_unreachable("Unknown configuration");
 }
-}
+                                   
 
 std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
                                               Configuration config) {
@@ -39,7 +47,8 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
   switch (config) {
   case Configuration::Arith:
   case Configuration::Comb:
-      return {builder.getI64IntegerAttr(0),
+    return {builder.getUnitAttr(),
+            builder.getI64IntegerAttr(0),
             builder.getI64IntegerAttr(1),
             builder.getI64IntegerAttr(2),
             builder.getI64IntegerAttr(3),
@@ -82,8 +91,19 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
             LLVM::IntegerOverflowFlags::nuw)};
 
   case Configuration::SMT:
-    return {IntegerAttr::get(builder.getIntegerType(1), -1),
-            IntegerAttr::get(builder.getIntegerType(1), 0)};
+    return {
+        builder.getUnitAttr(),
+        IntegerAttr::get(builder.getIntegerType(1), -1),
+        IntegerAttr::get(builder.getIntegerType(1), 0),
+        builder.getI64IntegerAttr(0),
+        builder.getI64IntegerAttr(1),
+        builder.getI64IntegerAttr(2),
+        builder.getI64IntegerAttr(3),
+        builder.getI64IntegerAttr(4),
+        builder.getI64IntegerAttr(5),
+        builder.getI64IntegerAttr(6),
+        builder.getI64IntegerAttr(7),
+    };
   }
   llvm_unreachable("Unknown configuration");
 }

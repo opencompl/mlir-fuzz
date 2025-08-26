@@ -131,6 +131,13 @@ int main(int argc, char **argv) {
                                   "Generate types and attributes for the smt "
                                   "dialect")));
 
+  static llvm::cl::opt<std::string> bitVectorWidths(
+      "bit-vector-widths",
+      llvm::cl::desc("In case the configuration is set to \"smt\", this is a "
+                     "list of comma-separated bitwidths. If not specified, "
+                     "this corresponds to no BitVector instructions."),
+      llvm::cl::init(""));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR superoptimizer");
 
@@ -140,6 +147,15 @@ int main(int argc, char **argv) {
   // Printing flags
   OpPrintingFlags printingFlags;
   printingFlags.printGenericOpForm(printOpGeneric);
+
+  std::vector<unsigned> smtBvWidths;
+  {
+    std::stringstream ss(bitVectorWidths);
+    std::string width;
+    while (std::getline(ss, width, ',')) {
+      smtBvWidths.push_back(std::stoi(width));
+    }
+  }
 
   // Register all dialects
   DialectRegistry registry;
@@ -199,7 +215,8 @@ int main(int argc, char **argv) {
 
   while (auto chooser = guide.makeChooser()) {
     auto module = createProgramFromInput(
-        ctx, inputFunc, availableOps, getAvailableTypes(ctx, configuration),
+        ctx, inputFunc, availableOps,
+        getAvailableTypes(ctx, configuration, smtBvWidths),
         getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
         correctProgramCounter, createValueOutOfThinAir, useInputOps);
     if (!module)
