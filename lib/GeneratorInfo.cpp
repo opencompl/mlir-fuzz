@@ -169,7 +169,8 @@ getZeroCostValueWithIndex(GeneratorInfo &info, Type type, int index) {
 
 mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
                                                 mlir::Type resultType,
-                                                size_t resultIdx, int fuel) {
+                                                size_t resultIdx, int fuel,
+                                                bool exactSize) {
   const static std::string COMMUTATIVITY = "commutativity";
   auto ctx = builder.getContext();
 
@@ -207,7 +208,8 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
         [](mlir::irdl::OperationOp op) { return true; };
 
     // LHS can be generated freely
-    auto [LHSvalue, LHSIsZeroCost] = addRootedOperation(LHStype, LHSfuel);
+    auto [LHSvalue, LHSIsZeroCost] =
+        addRootedOperation(LHStype, LHSfuel, exactSize);
     if (!LHSvalue.has_value()) {
       return nullptr;
     }
@@ -246,7 +248,7 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
           possibleResults[chooser->choose(possibleResults.size())];
 
       mlir::Operation *RHSoperation =
-          createOperation(RHSop, RHStype, RHSresultIdx, RHSfuel - 1);
+          createOperation(RHSop, RHStype, RHSresultIdx, RHSfuel - 1, exactSize);
       if (RHSoperation == nullptr) {
         return nullptr;
       }
@@ -258,7 +260,8 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
     }
     operands.push_back(*RHSvalue);
   } else {
-    for (auto operand : getOperandsConstraints(op)) {
+    std::vector<Value> operandConstraints = getOperandsConstraints(op);
+    for (auto [operandIdx, operand] : llvm::enumerate(operandConstraints)) {
       auto satisfyingTypes = getSatisfyingTypes(*ctx, valueToIdx[operand],
                                                 verifier, availableTypes);
       if (satisfyingTypes.empty())
@@ -269,10 +272,16 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
           verifier.verify({}, TypeAttr::get(type), valueToIdx[operand]);
       assert(succeeded.succeeded());
 
-      int operandFuel = chooser->choose(fuel + 1);
+      int operandFuel = 0;
+      if (exactSize && (operandIdx == operandConstraints.size() - 1)) {
+        operandFuel = fuel;
+      } else {
+        operandFuel = chooser->choose(fuel + 1);
+      }
       fuel -= operandFuel;
 
-      auto [operandValue, isZeroCost] = addRootedOperation(type, operandFuel);
+      auto [operandValue, isZeroCost] =
+          addRootedOperation(type, operandFuel, exactSize);
       if (!operandValue.has_value())
         return nullptr;
       operands.push_back(*operandValue);
@@ -336,12 +345,12 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
 /// index. This function will also create a number of operations less than
 /// `fuel` operations.
 std::pair<std::optional<Value>, int>
-GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
+GeneratorInfo::addRootedOperation(Type resultType, int fuel, bool exactSize) {
 
   // When we don't have fuel anymore, we either use a dominated value,
   // or we create a value out of thin air, which may include adding
   // a new function argument.
-  if (fuel == 0 || chooser->choose(2) == 0)
+  if (fuel == 0 || (!exactSize && chooser->choose(2) == 0))
     return getZeroCostValue(*this, resultType);
 
   // Cost of the current operation being created.
@@ -354,7 +363,8 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
   auto [op, possibleResults] = operations[chooser->choose(operations.size())];
   size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];
 
-  mlir::Operation *operation = createOperation(op, resultType, resultIdx, fuel);
+  mlir::Operation *operation =
+      createOperation(op, resultType, resultIdx, fuel, exactSize);
   if (operation == nullptr) {
     return {};
   }
@@ -367,11 +377,13 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel) {
 
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
-OwningOpRef<ModuleOp> createProgram(
-    MLIRContext &ctx, ArrayRef<OperationOp> availableOps,
-    ArrayRef<Type> availableTypes, ArrayRef<Attribute> availableAttributes,
-    tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
-    GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir) {
+OwningOpRef<ModuleOp>
+createProgram(MLIRContext &ctx, ArrayRef<OperationOp> availableOps,
+              ArrayRef<Type> availableTypes,
+              ArrayRef<Attribute> availableAttributes,
+              tree_guide::Chooser *chooser, int numOps, int numArgs, int seed,
+              GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir,
+              bool exactSize) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -392,7 +404,7 @@ OwningOpRef<ModuleOp> createProgram(
                      availableAttributes, numArgs, createValueOutOfThinAir);
 
   auto type = availableTypes[chooser->choose(availableTypes.size())];
-  auto [root, isZeroCost] = info.addRootedOperation(type, numOps);
+  auto [root, isZeroCost] = info.addRootedOperation(type, numOps, exactSize);
   if (!root.has_value())
     return nullptr;
   builder.create<func::ReturnOp>(unknownLoc, *root);

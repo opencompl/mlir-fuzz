@@ -63,6 +63,13 @@ int main(int argc, char **argv) {
       llvm::cl::desc("Maximum number of non-constant operations"),
       llvm::cl::init(3));
 
+  // Number of non-constant operations to be printed.
+  static llvm::cl::opt<bool> exactSize(
+      "exact-size",
+      llvm::cl::desc(
+          "Should the generated programs have exactly max-num-ops operations"),
+      llvm::cl::init(false));
+
   // Maximum number of arguments to be added per function.
   static llvm::cl::opt<int> maxNumArgs(
       "max-num-args",
@@ -272,7 +279,7 @@ int main(int argc, char **argv) {
       return createProgram(
           ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
           getAvailableAttributes(ctx, configuration), chooser, maxNumOps,
-          maxNumArgs, seed, createValueOutOfThinAir);
+          maxNumArgs, seed, createValueOutOfThinAir, exactSize);
     };
   } else {
     std::ifstream f(buildingBlocks);
