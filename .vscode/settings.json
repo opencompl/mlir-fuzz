@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.inc": "cpp",
+        "array": "cpp",
+        "tuple": "cpp",
+        "complex": "cpp"
+    }
+}
