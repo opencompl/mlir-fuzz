@@ -1,15 +1,14 @@
 #include "CLITool.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/Support/SourceMgr.h"
-
 
 using namespace mlir;
 
@@ -26,7 +25,6 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
   case Configuration::LLVM:
     return {
         builder.getIntegerType(1),
-        builder.getIntegerType(32),
         builder.getIntegerType(64),
     };
   case Configuration::SMT: {
@@ -36,10 +34,9 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
     }
     return types;
   }
-}
+  }
   llvm_unreachable("Unknown configuration");
 }
-                                   
 
 std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
                                               Configuration config) {
@@ -79,16 +76,16 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
             builder.getI64IntegerAttr(8),
             builder.getI64IntegerAttr(9),
             builder.getUnitAttr(), // For 'exact'
-            builder.getUnitAttr(),  // For 'disjoint'
+            builder.getUnitAttr(), // For 'disjoint'
             LLVM::IntegerOverflowFlagsAttr::get(
-                    &ctx, LLVM::IntegerOverflowFlags::none),
+                &ctx, LLVM::IntegerOverflowFlags::none),
             LLVM::IntegerOverflowFlagsAttr::get(
-                    &ctx, LLVM::IntegerOverflowFlags::nsw),
+                &ctx, LLVM::IntegerOverflowFlags::nsw),
             LLVM::IntegerOverflowFlagsAttr::get(
-                    &ctx, LLVM::IntegerOverflowFlags::nuw),
+                &ctx, LLVM::IntegerOverflowFlags::nuw),
             LLVM::IntegerOverflowFlagsAttr::get(
-                    &ctx, LLVM::IntegerOverflowFlags::nsw |
-            LLVM::IntegerOverflowFlags::nuw)};
+                &ctx, LLVM::IntegerOverflowFlags::nsw |
+                          LLVM::IntegerOverflowFlags::nuw)};
 
   case Configuration::SMT:
     return {
