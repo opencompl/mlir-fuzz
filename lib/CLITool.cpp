@@ -34,7 +34,17 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
         builder.getIntegerType(1),
         builder.getIntegerType(64),
     };
-  }
+  case Configuration::Tensor:
+    return {
+        builder.getF32Type(),
+        builder.getIndexType(),
+        builder.getIntegerType(64),
+        RankedTensorType::get({2, 2}, builder.getF32Type()),
+        RankedTensorType::get({4, 4}, builder.getF32Type()),
+        RankedTensorType::get({2, 4}, builder.getF32Type()),
+        RankedTensorType::get({4, 2}, builder.getF32Type()),
+    };
+  };
   llvm_unreachable("Unknown configuration");
 }
 
@@ -100,6 +110,8 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
             LLVM::IntegerOverflowFlagsAttr::get(
                 &ctx, LLVM::IntegerOverflowFlags::nsw |
                           LLVM::IntegerOverflowFlags::nuw)};
+  case Configuration::Tensor:
+    return {};
   }
   llvm_unreachable("Unknown configuration");
 }

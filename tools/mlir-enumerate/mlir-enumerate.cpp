@@ -142,18 +142,22 @@ int main(int argc, char **argv) {
       llvm::cl::desc(
           "Configuration to use for generating types and attributes"),
       llvm::cl::init(Configuration::Arith),
-      llvm::cl::values(clEnumValN(Configuration::Arith, "arith",
-                                  "Generate types and attributes for the arith "
-                                  "dialect (default)"),
-                       clEnumValN(Configuration::Comb, "comb",
-                                  "Generate types and attributes for the comb "
-                                  "dialect"),
-                       clEnumValN(Configuration::SMT, "smt",
-                                  "Generate types and attributes for the smt "
-                                  "dialect"),
-                       clEnumValN(Configuration::LLVM, "llvm",
-                                  "Generate types and attributes for the llvm "
-                                  "dialect")));
+      llvm::cl::values(
+          clEnumValN(Configuration::Arith, "arith",
+                     "Generate types and attributes for the arith "
+                     "dialect (default)"),
+          clEnumValN(Configuration::Comb, "comb",
+                     "Generate types and attributes for the comb "
+                     "dialect"),
+          clEnumValN(Configuration::SMT, "smt",
+                     "Generate types and attributes for the smt "
+                     "dialect"),
+          clEnumValN(Configuration::LLVM, "llvm",
+                     "Generate types and attributes for the llvm "
+                     "dialect"),
+          clEnumValN(Configuration::Tensor, "tensor",
+                     "Generate types and attributes for the tensor "
+                     "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
       "smt-bitvector-widths",

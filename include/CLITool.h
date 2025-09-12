@@ -22,6 +22,7 @@ enum class Configuration {
   Comb,
   LLVM,
   SMT,
+  Tensor,
 };
 
 /// Get the types that the fuzzer supports.
