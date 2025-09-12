@@ -1,6 +1,7 @@
 #include "CLITool.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/Dialect/SMT/IR/SMTTypes.h"
@@ -28,6 +29,11 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
     }
     return types;
   }
+  case Configuration::LLVM:
+    return {
+        builder.getIntegerType(1),
+        builder.getIntegerType(64),
+    };
   }
   llvm_unreachable("Unknown configuration");
 }
@@ -72,6 +78,28 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
         builder.getI64IntegerAttr(6),
         builder.getI64IntegerAttr(7),
     };
+  case Configuration::LLVM:
+    return {builder.getI64IntegerAttr(0),
+            builder.getI64IntegerAttr(1),
+            builder.getI64IntegerAttr(2),
+            builder.getI64IntegerAttr(3),
+            builder.getI64IntegerAttr(4),
+            builder.getI64IntegerAttr(5),
+            builder.getI64IntegerAttr(6),
+            builder.getI64IntegerAttr(7),
+            builder.getI64IntegerAttr(8),
+            builder.getI64IntegerAttr(9),
+            builder.getUnitAttr(), // For 'exact'
+            builder.getUnitAttr(), // For 'disjoint'
+            LLVM::IntegerOverflowFlagsAttr::get(
+                &ctx, LLVM::IntegerOverflowFlags::none),
+            LLVM::IntegerOverflowFlagsAttr::get(
+                &ctx, LLVM::IntegerOverflowFlags::nsw),
+            LLVM::IntegerOverflowFlagsAttr::get(
+                &ctx, LLVM::IntegerOverflowFlags::nuw),
+            LLVM::IntegerOverflowFlagsAttr::get(
+                &ctx, LLVM::IntegerOverflowFlags::nsw |
+                          LLVM::IntegerOverflowFlags::nuw)};
   }
   llvm_unreachable("Unknown configuration");
 }

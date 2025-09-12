@@ -20,6 +20,7 @@
 enum class Configuration {
   Arith,
   Comb,
+  LLVM,
   SMT,
 };
 

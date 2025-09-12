@@ -150,6 +150,9 @@ int main(int argc, char **argv) {
                                   "dialect"),
                        clEnumValN(Configuration::SMT, "smt",
                                   "Generate types and attributes for the smt "
+                                  "dialect"),
+                       clEnumValN(Configuration::LLVM, "llvm",
+                                  "Generate types and attributes for the llvm "
                                   "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
