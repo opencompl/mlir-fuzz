@@ -37,7 +37,6 @@ module {
     // }
 
     irdl.operation @andi {
-      %i1 = irdl.is i1
       %integer = irdl.base "!builtin.integer"
       %T = irdl.any_of(%integer)
       irdl.operands(operand0: %integer, operand1: %integer)

@@ -256,6 +256,17 @@ int main(int argc, char **argv) {
         return op.getResult();
       }
 
+      if (constantKind == ConstantKind::Constant &&
+          configuration == Configuration::Arith &&
+          mlir::isa<mlir::IntegerType>(type)) {
+        int64_t value = info.chooser->choose(2);
+        auto valueAttr = IntegerAttr::get(type, value);
+        auto typedValue = mlir::cast<TypedAttr>(valueAttr);
+        auto constant = info.builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), typedValue);
+        return constant.getResult();
+      }
+
       if (constantKind != ConstantKind::None && constantName != "") {
         if (auto intType = mlir::dyn_cast<IntegerType>(type)) {
           auto value =

@@ -20,6 +20,8 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
   case Configuration::Comb:
     return {
         builder.getIntegerType(1),
+        builder.getIntegerType(8),
+        builder.getIntegerType(32),
         builder.getIntegerType(64),
     };
   case Configuration::SMT: {
@@ -32,6 +34,7 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
   case Configuration::LLVM:
     return {
         builder.getIntegerType(1),
+        builder.getIntegerType(8),
         builder.getIntegerType(64),
     };
   case Configuration::Tensor:

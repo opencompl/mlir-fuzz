@@ -121,15 +121,22 @@ int main(int argc, char **argv) {
       llvm::cl::desc(
           "Configuration to use for generating types and attributes"),
       llvm::cl::init(Configuration::Arith),
-      llvm::cl::values(clEnumValN(Configuration::Arith, "arith",
-                                  "Generate types and attributes for the arith "
-                                  "dialect (default)"),
-                       clEnumValN(Configuration::Comb, "comb",
-                                  "Generate types and attributes for the comb "
-                                  "dialect"),
-                       clEnumValN(Configuration::SMT, "smt",
-                                  "Generate types and attributes for the smt "
-                                  "dialect")));
+      llvm::cl::values(
+          clEnumValN(Configuration::Arith, "arith",
+                     "Generate types and attributes for the arith "
+                     "dialect (default)"),
+          clEnumValN(Configuration::Comb, "comb",
+                     "Generate types and attributes for the comb "
+                     "dialect"),
+          clEnumValN(Configuration::SMT, "smt",
+                     "Generate types and attributes for the smt "
+                     "dialect"),
+          clEnumValN(Configuration::LLVM, "llvm",
+                     "Generate types and attributes for the llvm "
+                     "dialect"),
+          clEnumValN(Configuration::Tensor, "tensor",
+                     "Generate types and attributes for the tensor "
+                     "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
       "bit-vector-widths",
@@ -204,7 +211,7 @@ int main(int argc, char **argv) {
   size_t correctProgramCounter = 0;
 
   // Create the correct guide depending on the chosen strategy
-  auto guide = tree_guide::BFSGuide();
+  auto guide = tree_guide::EnumeratingGuide();
 
   auto createValueOutOfThinAir = [&ctx](GeneratorInfo &info,
                                         Type type) -> std::optional<Value> {
