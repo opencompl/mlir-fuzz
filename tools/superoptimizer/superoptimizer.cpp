@@ -32,7 +32,7 @@ OwningOpRef<ModuleOp> createProgramFromInput(
     MLIRContext &ctx, func::FuncOp inputFunction,
     ArrayRef<OperationOp> availableOps, ArrayRef<Type> availableTypes,
     ArrayRef<Attribute> availableAttributes, tree_guide::Chooser *chooser,
-    int numOps, int seed,
+    int numOps,
     GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir,
     bool useInputOps) {
   // Create an empty module.
@@ -49,14 +49,15 @@ OwningOpRef<ModuleOp> createProgramFromInput(
   if (useInputOps) {
     auto funcOp = builder.insert(inputFunction.clone());
     func = cast<func::FuncOp>(funcOp);
+    // We delete the return function, as well as the root operation we want to
+    // replace.
     func.getBlocks().front().getTerminator()->erase();
+    func.getBlocks().front().back().erase();
   } else {
     auto funcOp = builder.insert(inputFunction.cloneWithoutRegions());
     func = cast<func::FuncOp>(funcOp);
     func.addEntryBlock();
   }
-
-  func->setAttr("seed", IntegerAttr::get(IndexType::get(&ctx), (int64_t)seed));
 
   // Set the insertion point to it
   auto &funcBlock = func.getRegion().front();
@@ -225,7 +226,7 @@ int main(int argc, char **argv) {
         ctx, inputFunc, availableOps,
         getAvailableTypes(ctx, configuration, smtBvWidths),
         getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
-        correctProgramCounter, createValueOutOfThinAir, useInputOps);
+        createValueOutOfThinAir, useInputOps);
     if (!module)
       continue;
 
