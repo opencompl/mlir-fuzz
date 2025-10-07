@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
@@ -114,6 +115,14 @@ int main(int argc, char **argv) {
           clEnumValN(
               ConstantKind::Synth, "synth",
               "Generate a synth.constant operation instead of constants")));
+
+  static llvm::cl::opt<int> minConstantValue(
+      "min-constant-value",
+      llvm::cl::desc("Minimum value for integer constants"), llvm::cl::init(0));
+
+  static llvm::cl::opt<int> maxConstantValue(
+      "max-constant-value",
+      llvm::cl::desc("Maximum value for integer constants"), llvm::cl::init(1));
 
   static llvm::cl::opt<int> seed(
       "seed", llvm::cl::desc("Specify random seed used in generation"),
@@ -264,10 +273,25 @@ int main(int argc, char **argv) {
       if (constantKind == ConstantKind::Constant &&
           configuration == Configuration::Arith &&
           mlir::isa<mlir::IntegerType>(type)) {
-        int64_t value = info.chooser->choose(2);
+        int64_t value =
+            info.chooser->choose(maxConstantValue - minConstantValue + 1) +
+            minConstantValue;
         auto valueAttr = IntegerAttr::get(type, value);
         auto typedValue = mlir::cast<TypedAttr>(valueAttr);
         auto constant = info.builder.create<arith::ConstantOp>(
+            UnknownLoc::get(ctx), typedValue);
+        return constant.getResult();
+      }
+
+      if (constantKind == ConstantKind::Constant &&
+          configuration == Configuration::LLVM &&
+          mlir::isa<mlir::IntegerType>(type)) {
+        int64_t value =
+            info.chooser->choose(maxConstantValue - minConstantValue + 1) +
+            minConstantValue;
+        auto valueAttr = IntegerAttr::get(type, value);
+        auto typedValue = mlir::cast<TypedAttr>(valueAttr);
+        auto constant = info.builder.create<LLVM::ConstantOp>(
             UnknownLoc::get(ctx), typedValue);
         return constant.getResult();
       }
