@@ -76,7 +76,11 @@ int main(int argc, char **argv) {
           "Should the generated programs have exactly max-num-ops operations"),
       llvm::cl::init(false));
 
-  // Maximum number of arguments to be added per function.
+  static llvm::cl::opt<int> minNumArgs(
+      "min-num-args",
+      llvm::cl::desc("Minimum number of arguments per function"),
+      llvm::cl::init(0));
+
   static llvm::cl::opt<int> maxNumArgs(
       "max-num-args",
       llvm::cl::desc("Maximum number of arguments per function"),
@@ -343,9 +347,8 @@ int main(int argc, char **argv) {
       // we randomly pick a number in between and use an exact size generation.
       if (minNumOps != -1) {
         currentExactSize = true;
-        std::random_device rd;
-        std::uniform_int_distribution<int> dist(minNumOps, maxNumOps);
-        currentMaxNumOps = dist(rd);
+        currentMaxNumOps =
+            chooser->choose(maxNumOps - minNumOps + 1) + minNumOps;
       }
       return createProgram(
           ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
@@ -485,6 +488,14 @@ int main(int argc, char **argv) {
       // rewrite (which does nothing). Since the rewrite does nothing, the
       // pattern continues to match, which causes a failure.
       continue;
+    }
+
+    if (minNumArgs > 0) {
+      auto func = llvm::cast<mlir::func::FuncOp>(
+          *module->getBodyRegion().getOps<mlir::func::FuncOp>().begin());
+      int args = func.getNumArguments();
+      if (args < minNumArgs)
+        continue;
     }
 
     correctProgramCounter += 1;
