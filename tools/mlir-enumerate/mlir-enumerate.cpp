@@ -57,6 +57,11 @@ int main(int argc, char **argv) {
           "Print the number of programs that would be generated, and halt"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<int> minNumOps(
+      "min-num-ops",
+      llvm::cl::desc("Minimum number of non-constant operations"),
+      llvm::cl::init(-1));
+
   // Number of non-constant operations to be printed.
   static llvm::cl::opt<int> maxNumOps(
       "max-num-ops",
@@ -291,13 +296,37 @@ int main(int argc, char **argv) {
       return info.addFunctionArgument(type);
     };
 
+    if (minNumOps != -1) {
+      if (minNumOps > maxNumOps) {
+        llvm::errs()
+            << "min-num-ops must be less than or equal to max-num-ops\n";
+        return 1;
+      }
+      if (exactSize && minNumOps != maxNumOps) {
+        llvm::errs() << "If exact-size is set, min-num-ops must be equal to "
+                        "max-num-ops, or equal to -1\n";
+        return 1;
+      }
+    }
+
     programCreator = [availableOps, smtBvWidths, createValueOutOfThinAir](
                          MLIRContext &ctx, tree_guide::Chooser *chooser,
                          int seed) {
+      int currentMaxNumOps = maxNumOps;
+      bool currentExactSize = exactSize;
+
+      // In the case where we have a minimum and maximum number of operations,
+      // we randomly pick a number in between and use an exact size generation.
+      if (minNumOps != -1) {
+        currentExactSize = true;
+        std::random_device rd;
+        std::uniform_int_distribution<int> dist(minNumOps, maxNumOps);
+        currentMaxNumOps = dist(rd);
+      }
       return createProgram(
           ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
-          getAvailableAttributes(ctx, configuration), chooser, maxNumOps,
-          maxNumArgs, seed, createValueOutOfThinAir, exactSize);
+          getAvailableAttributes(ctx, configuration), chooser, currentMaxNumOps,
+          maxNumArgs, seed, createValueOutOfThinAir, currentExactSize);
     };
   } else {
     std::ifstream f(buildingBlocks);
