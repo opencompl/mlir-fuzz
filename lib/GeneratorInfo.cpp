@@ -357,8 +357,12 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel, bool exactSize) {
   fuel -= 1;
 
   auto operations = getOperationsWithResultType(resultType);
-  if (operations.empty())
-    return getZeroCostValue(*this, resultType);
+  if (operations.empty()) {
+    if (exactSize)
+      return {};
+    else
+      return getZeroCostValue(*this, resultType);
+  }
 
   auto [op, possibleResults] = operations[chooser->choose(operations.size())];
   size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];
