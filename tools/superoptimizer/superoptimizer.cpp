@@ -14,6 +14,7 @@
 
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
+#include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
@@ -26,6 +27,43 @@
 using namespace mlir;
 using namespace irdl;
 
+Type convertTypeToConfiguration(Type type, Configuration config) {
+  switch (config) {
+  case Configuration::Arith:
+    if (auto intType = mlir::dyn_cast<mlir::IntegerType>(type))
+      return intType;
+    if (auto smtBvType = mlir::dyn_cast<smt::BitVectorType>(type))
+      return mlir::IntegerType::get(type.getContext(), smtBvType.getWidth());
+    break;
+  default:
+    break;
+  }
+  llvm::errs() << "Unsupported type conversion from " << type
+               << " to provided configuration.\n";
+  return type;
+}
+
+func::FuncOp cloneFunctionWithConfiguration(func::FuncOp func,
+                                            Configuration config,
+                                            OpBuilder &builder) {
+  llvm::SmallVector<Type> input_types;
+  for (unsigned int i = 0; i < func.getFunctionType().getNumInputs(); i++) {
+    input_types.push_back(
+        convertTypeToConfiguration(func.getFunctionType().getInput(i), config));
+  }
+  llvm::SmallVector<Type> output_types;
+  for (unsigned int i = 0; i < func.getFunctionType().getNumResults(); i++) {
+    output_types.push_back(convertTypeToConfiguration(
+        func.getFunctionType().getResult(i), config));
+  }
+  auto funcType =
+      FunctionType::get(func.getContext(), input_types, output_types);
+  auto newFunc = func.cloneWithoutRegions();
+  newFunc.setType(funcType);
+  builder.insert(newFunc);
+  return newFunc;
+}
+
 /// Create a random program, given the decisions taken from chooser.
 /// The program has at most `fuel` operations.
 OwningOpRef<ModuleOp> createProgramFromInput(
@@ -34,7 +72,7 @@ OwningOpRef<ModuleOp> createProgramFromInput(
     ArrayRef<Attribute> availableAttributes, tree_guide::Chooser *chooser,
     int numOps,
     GeneratorInfo::CreateValueOutOfThinAirFn createValueOutOfThinAir,
-    bool useInputOps) {
+    bool useInputOps, Configuration config) {
   // Create an empty module.
   auto unknownLoc = UnknownLoc::get(&ctx);
   OwningOpRef<ModuleOp> module(ModuleOp::create(unknownLoc));
@@ -54,8 +92,7 @@ OwningOpRef<ModuleOp> createProgramFromInput(
     func.getBlocks().front().getTerminator()->erase();
     func.getBlocks().front().back().erase();
   } else {
-    auto funcOp = builder.insert(inputFunction.cloneWithoutRegions());
-    func = cast<func::FuncOp>(funcOp);
+    func = cloneFunctionWithConfiguration(inputFunction, config, builder);
     func.addEntryBlock();
   }
 
@@ -146,6 +183,12 @@ int main(int argc, char **argv) {
                      "this corresponds to no BitVector instructions."),
       llvm::cl::init(""));
 
+  static llvm::cl::opt<bool> optimization(
+      "optimize",
+      llvm::cl::desc(
+          "Only generate programs with a lower cost than the input program"),
+      llvm::cl::init(false));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR superoptimizer");
 
@@ -188,13 +231,15 @@ int main(int argc, char **argv) {
 
   assert(inputFunc.getFunctionType().getNumResults() == 1 &&
          "Expected exactly one result in the input function");
-  int numInputOps = -2; // Do not count the function and the return op.
-  inputFunc.walk([&numInputOps](Operation *op) {
-    if (op->getName().getStringRef() != "arith.constant" &&
-        op->getName().getStringRef() != "hw.constant")
-      numInputOps += 1;
-  });
-  maxNumOps = std::min((int)maxNumOps, numInputOps);
+  if (optimization) {
+    int numInputOps = -2; // Do not count the function and the return op.
+    inputFunc.walk([&numInputOps](Operation *op) {
+      if (op->getName().getStringRef() != "arith.constant" &&
+          op->getName().getStringRef() != "hw.constant")
+        numInputOps += 1;
+    });
+    maxNumOps = std::min((int)maxNumOps, numInputOps);
+  }
 
   // Try to parse the dialects.
   auto optDialects = parseMLIRFile(ctx, inputIRDLFilename);
@@ -226,7 +271,7 @@ int main(int argc, char **argv) {
         ctx, inputFunc, availableOps,
         getAvailableTypes(ctx, configuration, smtBvWidths),
         getAvailableAttributes(ctx, configuration), chooser.get(), maxNumOps,
-        createValueOutOfThinAir, useInputOps);
+        createValueOutOfThinAir, useInputOps, configuration);
     if (!module)
       continue;
 
