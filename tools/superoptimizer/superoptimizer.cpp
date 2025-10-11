@@ -34,12 +34,15 @@ Type convertTypeToConfiguration(Type type, Configuration config) {
       return intType;
     if (auto smtBvType = mlir::dyn_cast<smt::BitVectorType>(type))
       return mlir::IntegerType::get(type.getContext(), smtBvType.getWidth());
+    if (auto boolType = mlir::dyn_cast<smt::BoolType>(type))
+      return mlir::IntegerType::get(type.getContext(), 1);
     break;
   default:
     break;
   }
   llvm::errs() << "Unsupported type conversion from " << type
                << " to provided configuration.\n";
+  exit(1);
   return type;
 }
 
