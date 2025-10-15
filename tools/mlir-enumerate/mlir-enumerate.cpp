@@ -484,8 +484,9 @@ int main(int argc, char **argv) {
     }
 
     // Make sure the program does not contain an illegal subpattern.
-    if (applyPatternsGreedily(module->getBodyRegion(), frozenIllegals,
-                              {.maxIterations = 1, .maxNumRewrites = 1})
+    if (applyPatternsGreedily(
+            module->getBodyRegion(), frozenIllegals,
+            {.maxIterations = 1, .maxNumRewrites = 1, .fold = false})
             .failed()) {
       // If there is a fail, that means we matched the pattern, and apply the
       // rewrite (which does nothing). Since the rewrite does nothing, the
