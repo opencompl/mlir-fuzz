@@ -142,25 +142,30 @@ irdl.dialect @llvm {
     irdl.results(result0: %integer)
   }
 
-  irdl.operation @trunc { // needs to isExact flag
-    %integer1 = irdl.is i64
-    %integer = irdl.is i1
-    irdl.operands( operand1: %integer)
-    irdl.results(result0: %integer1)
-
+  irdl.operation @trunc { // needs to isExact flag, supports conversion from i64 to i64, i32 and i1
+    %integer1 = irdl.is i1
+    %integer32 = irdl.is i32
+    %integer = irdl.is i64
+    %opType= irdl.any_of(%integer1, %integer32, %integer)
+    irdl.operands(operand1: %integer)
+    irdl.results(result0: %opType)
   }
 
-  irdl.operation @sext { //currently only support i1 to i64 sign extension
+  irdl.operation @sext { //supports conversion from i1 and i32 to i64
     %integer1 = irdl.is i1
+    %integer32 = irdl.is i32
     %integer = irdl.is i64
-    irdl.operands( operand1: %integer1)
+    %opType= irdl.any_of(%integer1, %integer32)
+    irdl.operands(operand1: %opType)
     irdl.results(result0: %integer)
   }
 
-  irdl.operation @zext { //currently only support i1 to i64 sign extension
+  irdl.operation @zext { //supports conversions from i1 and i32 to i64
     %integer1 = irdl.is i1
+    %integer32 = irdl.is i32
     %integer = irdl.is i64
-    irdl.operands(operand1: %integer1)
+    %opType= irdl.any_of(%integer1, %integer32)
+    irdl.operands(operand1: %opType)
     irdl.results(result0: %integer)
   }
 }
