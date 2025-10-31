@@ -146,7 +146,7 @@ irdl.dialect @llvm {
     %integer1 = irdl.is i1
     %integer32 = irdl.is i32
     %integer = irdl.is i64
-    %opType= irdl.any_of(%integer1, %integer32, %integer)
+    %opType= irdl.any_of(%integer1, %integer32)
     irdl.operands(operand1: %integer)
     irdl.results(result0: %opType)
   }
