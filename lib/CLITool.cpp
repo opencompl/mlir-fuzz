@@ -47,6 +47,10 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
         RankedTensorType::get({2, 4}, builder.getF32Type()),
         RankedTensorType::get({4, 2}, builder.getF32Type()),
     };
+  case Configuration::Transfer:
+    return {
+        OpaqueType::get(StringAttr::get(&ctx, "transfer"), "integer"),
+    };
   };
   llvm_unreachable("Unknown configuration");
 }
@@ -114,6 +118,8 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
                 &ctx, LLVM::IntegerOverflowFlags::nsw |
                           LLVM::IntegerOverflowFlags::nuw)};
   case Configuration::Tensor:
+    return {};
+  case Configuration::Transfer:
     return {};
   }
   llvm_unreachable("Unknown configuration");

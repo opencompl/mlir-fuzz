@@ -177,6 +177,9 @@ int main(int argc, char **argv) {
                      "dialect"),
           clEnumValN(Configuration::Tensor, "tensor",
                      "Generate types and attributes for the tensor "
+                     "dialect"),
+          clEnumValN(Configuration::Transfer, "transfer",
+                     "Generate types and attributes for the transfer "
                      "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
