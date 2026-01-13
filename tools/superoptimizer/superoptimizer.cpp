@@ -180,6 +180,9 @@ int main(int argc, char **argv) {
                      "dialect"),
           clEnumValN(Configuration::Transfer, "transfer",
                      "Generate types and attributes for the transfer "
+                     "dialect"),
+          clEnumValN(Configuration::RISCV, "riscv",
+                     "Generate types and attributes for the riscv "
                      "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
