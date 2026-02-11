@@ -7,7 +7,38 @@ module {
       irdl.results(result0: %register)
     }
 
+    irdl.operation @addi attributes {synth} {
+      %register = irdl.is !riscv.reg
+      //For synth ops attributes will be constrained to 0, 
+      //then later generalized by the fuzzer to any value of their type
+      %imm = irdl.is 0 : si12 
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @addw {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    }
+
+    //Disabled due to not being in xdsl riscv dialect
+    //irdl.operation @addiw attributes {synth} {
+      //%register = irdl.is !riscv.reg
+      //%imm = irdl.is 0 : si12 
+      //irdl.operands(operand0: %register)
+      //irdl.results(result0: %register)
+      //irdl.attributes {"immediate" = %imm}
+    //}
+
     irdl.operation @sub {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    }
+
+    irdl.operation @subw {
       %register = irdl.is !riscv.reg
       irdl.operands(operand0: %register, operand1: %register)
       irdl.results(result0: %register)
@@ -19,84 +50,41 @@ module {
       irdl.results(result0: %register)
     }
 
+    irdl.operation @xori attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : si12
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
     irdl.operation @and {
       %register = irdl.is !riscv.reg
       irdl.operands(operand0: %register, operand1: %register)
       irdl.results(result0: %register)
     }
 
-    irdl.operation @or attributes {synth} {
+    irdl.operation @andi attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : si12
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @or {
       %register = irdl.is !riscv.reg
       irdl.operands(operand0: %register, operand1: %register)
       irdl.results(result0: %register)
     }
 
-    //irdl.operation @addi {
-      //%register = irdl.is !riscv.reg
-      //%0 = irdl.is 0 : si12 
-      //%1 = irdl.is 1 : si12
-      //%2 = irdl.is 2 : si12
-      //%3 = irdl.is 3 : si12
-      //%imm = irdl.any_of (%0, %1, %2, %3) 
-      //irdl.operands(operand0: %register)
-      //irdl.results(result0: %register)
-      //irdl.attributes {"immediate" = %imm}
-    //}
-
-    //irdl.operation @xori {
-      //%register = irdl.is !riscv.reg
-      //%0 = irdl.is 0 : si12
-      //%1 = irdl.is 1 : si12
-      //%2 = irdl.is 2 : si12
-      //%3 = irdl.is 3 : si12
-      //%4 = irdl.is 4 : si12
-      //%5 = irdl.is 5 : si12
-      //%6 = irdl.is 6 : si12
-      //%7 = irdl.is 7 : si12
-      //%8 = irdl.is 8 : si12
-      //%9 = irdl.is 9 : si12
-      //%imm = irdl.any_of (%0, %1, %2, %3, %4, %5, %6, %7, %8, %9) 
-      //irdl.operands(operand0: %register)
-      //irdl.results(result0: %register)
-      //irdl.attributes {"immediate" = %imm}
-    //}
-
-    //irdl.operation @andi {
-      //%register = irdl.is !riscv.reg
-      //%0 = irdl.is 0 : si12
-      //%1 = irdl.is 1 : si12
-      //%2 = irdl.is 2 : si12
-      //%3 = irdl.is 3 : si12
-      //%4 = irdl.is 4 : si12
-      //%5 = irdl.is 5 : si12
-      //%6 = irdl.is 6 : si12
-      //%7 = irdl.is 7 : si12
-      //%8 = irdl.is 8 : si12
-      //%9 = irdl.is 9 : si12
-      //%imm = irdl.any_of (%0, %1, %2, %3, %4, %5, %6, %7, %8, %9) 
-      //irdl.operands(operand0: %register)
-      //irdl.results(result0: %register)
-      //irdl.attributes {"immediate" = %imm}
-    //}
-
-    //irdl.operation @ori {
-      //%register = irdl.is !riscv.reg
-
-      //%0 = irdl.is 0 : si12
-      //%1 = irdl.is 1 : si12
-      //%2 = irdl.is 2 : si12
-      //%3 = irdl.is 3 : si12
-      //%4 = irdl.is 4 : si12
-      //%5 = irdl.is 5 : si12
-      //%6 = irdl.is 6 : si12
-      //%7 = irdl.is 7 : si12
-      //%8 = irdl.is 8 : si12
-      //%9 = irdl.is 9 : si12
-      //%imm = irdl.any_of (%0, %1, %2, %3, %4, %5, %6, %7, %8, %9) 
-      //irdl.operands(operand0: %register)
-      //irdl.results(result0: %register)
-      //irdl.attributes {"immediate" = %imm}
-    //}
+    irdl.operation @ori attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : si12
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
 
     irdl.operation @slt {
       %register = irdl.is !riscv.reg
@@ -104,5 +92,118 @@ module {
       irdl.results(result0: %register)
     } 
 
+    irdl.operation @slti attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : si12
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @sltu {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    irdl.operation @sltiu attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : si12
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @sll {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    irdl.operation @slli attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : ui5
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @sllw {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    //irdl.operation @slliw attributes {synth} {
+      //%register = irdl.is !riscv.reg
+      //%imm = irdl.is 0 : si12
+      //irdl.operands(operand0: %register)
+      //irdl.results(result0: %register)
+      //irdl.attributes {"immediate" = %imm}
+    //}
+
+    //irdl.operation @slli.wu attributes {synth} {
+      //%register = irdl.is !riscv.reg
+      //%imm = irdl.is 0 : si12
+      //irdl.operands(operand0: %register)
+      //irdl.results(result0: %register)
+      //irdl.attributes {"immediate" = %imm}
+    //}
+
+    irdl.operation @srl {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    irdl.operation @srli attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : ui5
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @srlw {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    irdl.operation @srliw attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : ui5
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @sra {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    irdl.operation @srai attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : ui5
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
+
+    irdl.operation @sraw {
+      %register = irdl.is !riscv.reg
+      irdl.operands(operand0: %register, operand1: %register)
+      irdl.results(result0: %register)
+    } 
+
+    irdl.operation @sraiw attributes {synth} {
+      %register = irdl.is !riscv.reg
+      %imm = irdl.is 0 : ui5
+      irdl.operands(operand0: %register)
+      irdl.results(result0: %register)
+      irdl.attributes {"immediate" = %imm}
+    }
   }
 }

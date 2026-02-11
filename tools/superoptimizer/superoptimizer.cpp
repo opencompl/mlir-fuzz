@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SMT/IR/SMTTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -201,6 +202,12 @@ int main(int argc, char **argv) {
           "Only generate programs with a lower cost than the input program"),
       llvm::cl::init(false));
 
+  static llvm::cl::opt<bool> synth_ops(
+      "synth-ops",
+      llvm::cl::desc(
+          "Don't generate synth.constants, instead use synth.op"),
+      llvm::cl::init(false));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR superoptimizer");
 
@@ -260,11 +267,15 @@ int main(int argc, char **argv) {
 
   // Get the dialects.
   auto &dialects = optDialects.value();
+  mlir::OpBuilder builder(dialects->getContext());
 
   // Get the list of operations we support.
   std::vector<OperationOp> availableOps = {};
   dialects->walk(
-      [&availableOps](OperationOp op) { availableOps.push_back(op); });
+      [&availableOps, &builder](OperationOp op) { 
+        if(synth_ops && op->hasAttr("synth")) op->setAttr("gen_synth", builder.getUnitAttr());
+        availableOps.push_back(op);
+      });
   size_t programCounter = 0;
   size_t correctProgramCounter = 0;
 
@@ -273,6 +284,7 @@ int main(int argc, char **argv) {
 
   auto createValueOutOfThinAir = [&ctx](GeneratorInfo &info,
                                         Type type) -> std::optional<Value> {
+    if(synth_ops) return {};
     OperationState state(UnknownLoc::get(&ctx), "synth.constant", {}, {type});
     auto op = info.builder.create(state);
     return op->getResult(0);
