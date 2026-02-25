@@ -51,6 +51,10 @@ std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
     return {
         OpaqueType::get(StringAttr::get(&ctx, "transfer"), "integer"),
     };
+  case Configuration::RISCV:
+    return {
+        OpaqueType::get(StringAttr::get(&ctx, "riscv"), "reg"),
+    };
   };
   llvm_unreachable("Unknown configuration");
 }
@@ -117,6 +121,12 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
             LLVM::IntegerOverflowFlagsAttr::get(
                 &ctx, LLVM::IntegerOverflowFlags::nsw |
                           LLVM::IntegerOverflowFlags::nuw)};
+  case Configuration::RISCV:
+    return {
+      IntegerAttr::get(builder.getIntegerType(12, true), 0),
+      IntegerAttr::get(builder.getIntegerType(5, false), 0),
+      IntegerAttr::get(builder.getIntegerType(6, false), 0),
+    };
   case Configuration::Tensor:
     return {};
   case Configuration::Transfer:

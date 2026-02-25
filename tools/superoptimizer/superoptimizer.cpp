@@ -27,7 +27,7 @@
 using namespace mlir;
 using namespace irdl;
 
-Type convertTypeToConfiguration(Type type, Configuration config) {
+Type convertTypeToConfiguration(Type type, Configuration config, MLIRContext &ctx) {
   switch (config) {
   case Configuration::Arith:
     if (auto intType = mlir::dyn_cast<mlir::IntegerType>(type))
@@ -37,6 +37,8 @@ Type convertTypeToConfiguration(Type type, Configuration config) {
     if (auto boolType = mlir::dyn_cast<smt::BoolType>(type))
       return mlir::IntegerType::get(type.getContext(), 1);
     break;
+  case Configuration::RISCV:
+    return mlir::OpaqueType::get(mlir::StringAttr::get(&ctx, "riscv"), "reg");
   default:
     break;
   }
@@ -48,16 +50,17 @@ Type convertTypeToConfiguration(Type type, Configuration config) {
 
 func::FuncOp cloneFunctionWithConfiguration(func::FuncOp func,
                                             Configuration config,
-                                            OpBuilder &builder) {
+                                            OpBuilder &builder,
+                                            MLIRContext &ctx) {
   llvm::SmallVector<Type> input_types;
   for (unsigned int i = 0; i < func.getFunctionType().getNumInputs(); i++) {
     input_types.push_back(
-        convertTypeToConfiguration(func.getFunctionType().getInput(i), config));
+        convertTypeToConfiguration(func.getFunctionType().getInput(i), config, ctx));
   }
   llvm::SmallVector<Type> output_types;
   for (unsigned int i = 0; i < func.getFunctionType().getNumResults(); i++) {
     output_types.push_back(convertTypeToConfiguration(
-        func.getFunctionType().getResult(i), config));
+        func.getFunctionType().getResult(i), config, ctx));
   }
   auto funcType =
       FunctionType::get(func.getContext(), input_types, output_types);
@@ -95,7 +98,7 @@ OwningOpRef<ModuleOp> createProgramFromInput(
     func.getBlocks().front().getTerminator()->erase();
     func.getBlocks().front().back().erase();
   } else {
-    func = cloneFunctionWithConfiguration(inputFunction, config, builder);
+    func = cloneFunctionWithConfiguration(inputFunction, config, builder, ctx);
     func.addEntryBlock();
   }
 
@@ -180,6 +183,9 @@ int main(int argc, char **argv) {
                      "dialect"),
           clEnumValN(Configuration::Transfer, "transfer",
                      "Generate types and attributes for the transfer "
+                     "dialect"),
+          clEnumValN(Configuration::RISCV, "riscv",
+                     "Generate types and attributes for the riscv "
                      "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
