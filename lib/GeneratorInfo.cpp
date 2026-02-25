@@ -167,11 +167,42 @@ getZeroCostValueWithIndex(GeneratorInfo &info, Type type, int index) {
   }
 }
 
+// Currently this generalizes irdl.is constraints to their underlying type
+// Which is useful in particular for riscv immediates and shift values.
+// If this would be useful for other dialects it may make sense to build a
+// more robust attribute than a type to attempt to encompass the constraints
+mlir::Type generalizeTypeFromConstraint(mlir::Value constraint) {
+    mlir::Operation* defOp = constraint.getDefiningOp();
+    if(!defOp) return nullptr;
+
+    if (auto isOp = llvm::dyn_cast<mlir::irdl::IsOp>(defOp)) {
+      auto attr = isOp.getExpected();
+      if(auto typeAttr = llvm::dyn_cast<mlir::TypeAttr>(attr)) 
+        return typeAttr.getValue();
+      if(auto typedAttr = llvm::dyn_cast<mlir::TypedAttr>(attr))
+        return typedAttr.getType();
+      return nullptr;
+    }
+
+    if (auto anyOfOp = llvm::dyn_cast<mlir::irdl::AnyOfOp>(defOp)) {
+      mlir::Type type = nullptr;
+      for(auto arg : anyOfOp.getArgs()){
+        auto crType = generalizeTypeFromConstraint(arg);
+        if(!crType || (type && type!=crType)) return nullptr;
+        type = crType;
+      }
+      return type;
+    }
+
+    return nullptr;
+}
+
 mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
                                                 mlir::Type resultType,
                                                 size_t resultIdx, int fuel,
                                                 bool exactSize) {
   const static std::string COMMUTATIVITY = "commutativity";
+  const static std::string GEN_SYNTH = "gen_synth";
   auto ctx = builder.getContext();
 
   // Create a new verifier that will keep track of the values we have already
@@ -308,6 +339,24 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
   }
 
   std::vector<NamedAttribute> attributes;
+  StringRef dialectName = op.getParentOp().getName();
+  StringRef opSuffix = op.getNameAttr().getValue();
+  StringAttr opName = StringAttr::get(ctx, dialectName + "." + opSuffix);
+  
+  if(op->hasAttr(GEN_SYNTH)){
+    auto orig_name = NamedAttribute(StringAttr::get(ctx, "op_name"), opName);
+    opName = StringAttr::get(ctx, "synth.op");
+    for (auto [name, constraint] : getAttributesConstraints(op)){
+      mlir::Type type = generalizeTypeFromConstraint(constraint);
+      if(!type) return nullptr;
+      attributes.emplace_back(StringAttr::get(ctx, name), TypeAttr::get(type));
+    }
+    
+    auto *operation = builder.create(UnknownLoc::get(ctx), opName, operands, resultTypes, attributes);
+    assert(operation->setPropertiesFromAttribute(builder.getDictionaryAttr({orig_name}), {}).succeeded());
+    return operation;
+  }
+
   for (auto [name, constraint] : getAttributesConstraints(op)) {
     auto satisfyingAttrs = getSatisfyingAttrs(*ctx, valueToIdx[constraint],
                                               verifier, availableAttributes);
@@ -323,10 +372,6 @@ mlir::Operation *GeneratorInfo::createOperation(mlir::irdl::OperationOp op,
     assert(succeeded.succeeded());
     attributes.emplace_back(StringAttr::get(ctx, name), attr);
   }
-
-  StringRef dialectName = op.getParentOp().getName();
-  StringRef opSuffix = op.getNameAttr().getValue();
-  StringAttr opName = StringAttr::get(ctx, dialectName + "." + opSuffix);
 
   // Create the operation.
   auto *operation =
