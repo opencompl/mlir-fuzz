@@ -123,7 +123,9 @@ std::vector<Attribute> getAvailableAttributes(MLIRContext &ctx,
                           LLVM::IntegerOverflowFlags::nuw)};
   case Configuration::RISCV:
     return {
+      //Immediates
       IntegerAttr::get(builder.getIntegerType(12, true), 0),
+      //Shift Values
       IntegerAttr::get(builder.getIntegerType(5, false), 0),
       IntegerAttr::get(builder.getIntegerType(6, false), 0),
     };

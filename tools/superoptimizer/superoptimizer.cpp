@@ -27,7 +27,7 @@
 using namespace mlir;
 using namespace irdl;
 
-Type convertTypeToConfiguration(Type type, Configuration config, MLIRContext &ctx) {
+Type convertTypeToConfiguration(Type type, Configuration config) {
   switch (config) {
   case Configuration::Arith:
     if (auto intType = mlir::dyn_cast<mlir::IntegerType>(type))
@@ -38,7 +38,7 @@ Type convertTypeToConfiguration(Type type, Configuration config, MLIRContext &ct
       return mlir::IntegerType::get(type.getContext(), 1);
     break;
   case Configuration::RISCV:
-    return mlir::OpaqueType::get(mlir::StringAttr::get(&ctx, "riscv"), "reg");
+    return mlir::OpaqueType::get(mlir::StringAttr::get(type.getContext(), "riscv"), "reg");
   default:
     break;
   }
@@ -50,17 +50,16 @@ Type convertTypeToConfiguration(Type type, Configuration config, MLIRContext &ct
 
 func::FuncOp cloneFunctionWithConfiguration(func::FuncOp func,
                                             Configuration config,
-                                            OpBuilder &builder,
-                                            MLIRContext &ctx) {
+                                            OpBuilder &builder) {
   llvm::SmallVector<Type> input_types;
   for (unsigned int i = 0; i < func.getFunctionType().getNumInputs(); i++) {
     input_types.push_back(
-        convertTypeToConfiguration(func.getFunctionType().getInput(i), config, ctx));
+        convertTypeToConfiguration(func.getFunctionType().getInput(i), config));
   }
   llvm::SmallVector<Type> output_types;
   for (unsigned int i = 0; i < func.getFunctionType().getNumResults(); i++) {
     output_types.push_back(convertTypeToConfiguration(
-        func.getFunctionType().getResult(i), config, ctx));
+        func.getFunctionType().getResult(i), config));
   }
   auto funcType =
       FunctionType::get(func.getContext(), input_types, output_types);
@@ -98,7 +97,7 @@ OwningOpRef<ModuleOp> createProgramFromInput(
     func.getBlocks().front().getTerminator()->erase();
     func.getBlocks().front().back().erase();
   } else {
-    func = cloneFunctionWithConfiguration(inputFunction, config, builder, ctx);
+    func = cloneFunctionWithConfiguration(inputFunction, config, builder);
     func.addEntryBlock();
   }
 
