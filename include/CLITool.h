@@ -21,6 +21,7 @@ enum class Configuration {
   Arith,
   Comb,
   LLVM,
+  RISCV,
   SMT,
   Tensor,
   Transfer,

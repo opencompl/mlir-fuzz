@@ -37,6 +37,8 @@ Type convertTypeToConfiguration(Type type, Configuration config) {
     if (auto boolType = mlir::dyn_cast<smt::BoolType>(type))
       return mlir::IntegerType::get(type.getContext(), 1);
     break;
+  case Configuration::RISCV:
+    return mlir::OpaqueType::get(mlir::StringAttr::get(type.getContext(), "riscv"), "reg");
   default:
     break;
   }
@@ -180,6 +182,9 @@ int main(int argc, char **argv) {
                      "dialect"),
           clEnumValN(Configuration::Transfer, "transfer",
                      "Generate types and attributes for the transfer "
+                     "dialect"),
+          clEnumValN(Configuration::RISCV, "riscv",
+                     "Generate types and attributes for the riscv "
                      "dialect")));
 
   static llvm::cl::opt<std::string> bitVectorWidths(
