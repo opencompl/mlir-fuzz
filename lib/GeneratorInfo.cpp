@@ -350,19 +350,25 @@ GeneratorInfo::addRootedOperation(Type resultType, int fuel, bool exactSize) {
   // When we don't have fuel anymore, we either use a dominated value,
   // or we create a value out of thin air, which may include adding
   // a new function argument.
-  if (fuel == 0 || (!exactSize && chooser->choose(2) == 0))
+  if (fuel == 0)
     return getZeroCostValue(*this, resultType);
 
-  // Cost of the current operation being created.
-  fuel -= 1;
-
+  // If no operation can produce this type, the only option is a zero-cost
+  // value (or failure when an exact size is required). Skipping the binary
+  // choice below in this case avoids two distinct decision paths producing
+  // the same program.
   auto operations = getOperationsWithResultType(resultType);
   if (operations.empty()) {
     if (exactSize)
       return {};
-    else
-      return getZeroCostValue(*this, resultType);
+    return getZeroCostValue(*this, resultType);
   }
+
+  if (!exactSize && chooser->choose(2) == 0)
+    return getZeroCostValue(*this, resultType);
+
+  // Cost of the current operation being created.
+  fuel -= 1;
 
   auto [op, possibleResults] = operations[chooser->choose(operations.size())];
   size_t resultIdx = possibleResults[chooser->choose(possibleResults.size())];

@@ -8,12 +8,10 @@ irdl.dialect @llvm {
 
   irdl.operation @or { // to do: need to add disjoint flag 
     %integer = irdl.is i64
-    //%is_exact = irdl.is #llvm.isDisjoint
     irdl.operands(operand0: %integer, operand1: %integer)
     irdl.results(result0: %integer)
     %unit = irdl.is unit
-    irdl.attributes {"isDisjointFlag" = %unit}
-    // irdl.attributes {"isDisjoint" = %disjoint}
+    irdl.attributes {"isDisjoint" = %unit}
   }
 
   irdl.operation @xor { 
@@ -64,7 +62,7 @@ irdl.dialect @llvm {
     irdl.operands(operand0: %integer, operand1: %integer)
     irdl.results(result0: %integer)
     %unit = irdl.is unit
-    irdl.attributes {"isExactFlag" = %unit}
+    irdl.attributes {"isExact" = %unit}
   }
 
   irdl.operation @ashr {  // to do : support is exact flag 
@@ -72,7 +70,7 @@ irdl.dialect @llvm {
     irdl.operands(operand0: %integer, operand1: %integer)
     irdl.results(result0: %integer)
     %unit = irdl.is unit
-    irdl.attributes {"isExactFlag" = %unit}
+    irdl.attributes {"isExact" = %unit}
   }
 
   irdl.operation @mul { // to do : support llvm flags and not arith
@@ -92,7 +90,7 @@ irdl.dialect @llvm {
     irdl.operands(operand0: %integer, operand1: %integer)
     irdl.results(result0: %integer)
     %unit = irdl.is unit
-    irdl.attributes {"isExactFlag" = %unit}
+    irdl.attributes {"isExact" = %unit}
   }
 
   irdl.operation @udiv { // needs to isExact flag
