@@ -154,7 +154,7 @@ irdl.dialect @llvm {
     %integer16 = irdl.is i16
     %integer32 = irdl.is i32
     %integer = irdl.is i64
-    %opType= irdl.any_of(%integer16, %integer)
+    %opType= irdl.any_of(%integer16, %integer32)
     irdl.operands(operand1: %opType)
     irdl.results(result0: %integer)
   }
@@ -164,7 +164,7 @@ irdl.dialect @llvm {
     %integer16 = irdl.is i16
     %integer32 = irdl.is i32
     %integer = irdl.is i64
-    %opType= irdl.any_of(%integer16, %integer)
+    %opType= irdl.any_of(%integer16, %integer32)
     irdl.operands(operand1: %opType)
     irdl.results(result0: %integer)
   }
