@@ -141,7 +141,7 @@ irdl.dialect @llvm {
   }
 
   irdl.operation @trunc { // needs to isExact flag, supports conversion from i64 to i64, i32 and i1
-    %integer1 = irdl.is i1
+    // %integer1 = irdl.is i1
     %integer32 = irdl.is i32
     %integer = irdl.is i64
     %opType= irdl.any_of(%integer1, %integer32)
@@ -150,7 +150,7 @@ irdl.dialect @llvm {
   }
 
   irdl.operation @sext { //supports conversion from i1 and i32 to i64
-    %integer1 = irdl.is i1
+    // %integer1 = irdl.is i1
     %integer32 = irdl.is i32
     %integer = irdl.is i64
     %opType= irdl.any_of(%integer1, %integer32)
@@ -159,7 +159,7 @@ irdl.dialect @llvm {
   }
 
   irdl.operation @zext { //supports conversions from i1 and i32 to i64
-    %integer1 = irdl.is i1
+    // %integer1 = irdl.is i1
     %integer32 = irdl.is i32
     %integer = irdl.is i64
     %opType= irdl.any_of(%integer1, %integer32)
