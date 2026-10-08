@@ -263,9 +263,25 @@ int main(int argc, char **argv) {
       return WalkResult::advance();
     });
 
+    // Get the distinct values of the given integer type that are in the range
+    // [min-constant-value, max-constant-value], after truncation to the type
+    // bitwidth.
+    auto getConstantValues = [](IntegerType type) {
+      std::vector<APInt> values;
+      for (int64_t value = minConstantValue; value <= maxConstantValue;
+           ++value) {
+        APInt apValue =
+            APInt(64, value, /*isSigned=*/true).sextOrTrunc(type.getWidth());
+        if (!llvm::is_contained(values, apValue))
+          values.push_back(apValue);
+      }
+      return values;
+    };
+
     auto createValueOutOfThinAir =
-        [&smtBvWidths, constantName](GeneratorInfo &info,
-                                     Type type) -> std::optional<Value> {
+        [&smtBvWidths, constantName,
+         getConstantValues](GeneratorInfo &info,
+                            Type type) -> std::optional<Value> {
       auto *ctx = info.builder.getContext();
       auto func = llvm::cast<mlir::func::FuncOp>(
           *info.builder.getInsertionBlock()->getParentOp());
@@ -301,10 +317,9 @@ int main(int argc, char **argv) {
       if (constantKind == ConstantKind::Constant &&
           configuration == Configuration::Arith &&
           mlir::isa<mlir::IntegerType>(type)) {
-        int64_t value =
-            info.chooser->choose(maxConstantValue - minConstantValue + 1) +
-            minConstantValue;
-        auto valueAttr = IntegerAttr::get(type, value);
+        auto values = getConstantValues(mlir::cast<IntegerType>(type));
+        auto valueAttr =
+            IntegerAttr::get(type, values[info.chooser->choose(values.size())]);
         auto typedValue = mlir::cast<TypedAttr>(valueAttr);
         auto constant = info.builder.create<arith::ConstantOp>(
             UnknownLoc::get(ctx), typedValue);
@@ -314,10 +329,9 @@ int main(int argc, char **argv) {
       if (constantKind == ConstantKind::Constant &&
           configuration == Configuration::LLVM &&
           mlir::isa<mlir::IntegerType>(type)) {
-        int64_t value =
-            info.chooser->choose(maxConstantValue - minConstantValue + 1) +
-            minConstantValue;
-        auto valueAttr = IntegerAttr::get(type, value);
+        auto values = getConstantValues(mlir::cast<IntegerType>(type));
+        auto valueAttr =
+            IntegerAttr::get(type, values[info.chooser->choose(values.size())]);
         auto typedValue = mlir::cast<TypedAttr>(valueAttr);
         auto constant = info.builder.create<LLVM::ConstantOp>(
             UnknownLoc::get(ctx), typedValue);
