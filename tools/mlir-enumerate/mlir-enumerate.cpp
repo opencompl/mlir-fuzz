@@ -15,6 +15,7 @@
 #include "IRDLUtils.h"
 
 #include "mlir/Conversion/PDLToPDLInterp/PDLToPDLInterp.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
@@ -487,9 +488,11 @@ int main(int argc, char **argv) {
     }
 
     // Make sure the program does not contain an illegal subpattern.
-    if (applyPatternsGreedily(
-            module->getBodyRegion(), frozenIllegals,
-            {.maxIterations = 1, .maxNumRewrites = 1, .fold = false})
+    if (applyPatternsGreedily(module->getBodyRegion(), frozenIllegals,
+                              GreedyRewriteConfig()
+                                  .setMaxIterations(1)
+                                  .setMaxNumRewrites(1)
+                                  .enableFolding(false))
             .failed()) {
       // If there is a fail, that means we matched the pattern, and apply the
       // rewrite (which does nothing). Since the rewrite does nothing, the
