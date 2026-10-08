@@ -510,6 +510,20 @@ int main(int argc, char **argv) {
         continue;
     }
 
+    // The LLVM dialect verifier does not check that trunc reduces the
+    // bitwidth, which LLVM IR requires.
+    auto isInvalidTrunc = [](LLVM::TruncOp op) {
+      auto srcType = mlir::dyn_cast<IntegerType>(op.getArg().getType());
+      auto dstType = mlir::dyn_cast<IntegerType>(op.getType());
+      if (!srcType || !dstType)
+        return WalkResult::advance();
+      if (dstType.getWidth() >= srcType.getWidth())
+        return WalkResult::interrupt();
+      return WalkResult::advance();
+    };
+    if (module->walk(isInvalidTrunc).wasInterrupted())
+      continue;
+
     // Optionally run CSE
     if (cse) {
       auto pm = PassManager::on<ModuleOp>(&ctx);
