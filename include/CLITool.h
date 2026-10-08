@@ -28,9 +28,12 @@ enum class Configuration {
 };
 
 /// Get the types that the fuzzer supports.
-std::vector<mlir::Type> getAvailableTypes(mlir::MLIRContext &ctx,
-                                          Configuration config,
-                                          std::vector<unsigned> smtBvWidths);
+/// If `intWidths` is non-empty, it replaces the default integer types of the
+/// arith, comb, and llvm configurations.
+std::vector<mlir::Type>
+getAvailableTypes(mlir::MLIRContext &ctx, Configuration config,
+                  std::vector<unsigned> smtBvWidths,
+                  std::vector<unsigned> intWidths = {});
 
 /// Get the types that the fuzzer supports.
 std::vector<mlir::Attribute> getAvailableAttributes(mlir::MLIRContext &ctx,

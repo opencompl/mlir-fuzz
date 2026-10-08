@@ -191,6 +191,14 @@ int main(int argc, char **argv) {
                      "this corresponds to no BitVector instructions."),
       llvm::cl::init(""));
 
+  static llvm::cl::opt<std::string> intWidths(
+      "int-widths",
+      llvm::cl::desc("In case the configuration is set to \"arith\", "
+                     "\"comb\", or \"llvm\", this is a list of "
+                     "comma-separated integer bitwidths replacing the default "
+                     "integer types."),
+      llvm::cl::init(""));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -207,6 +215,15 @@ int main(int argc, char **argv) {
     std::string width;
     while (std::getline(ss, width, ',')) {
       smtBvWidths.push_back(std::stoi(width));
+    }
+  }
+
+  std::vector<unsigned> intBitWidths;
+  {
+    std::stringstream ss(intWidths);
+    std::string width;
+    while (std::getline(ss, width, ',')) {
+      intBitWidths.push_back(std::stoi(width));
     }
   }
 
@@ -344,7 +361,8 @@ int main(int argc, char **argv) {
       }
     }
 
-    programCreator = [availableOps, smtBvWidths, createValueOutOfThinAir](
+    programCreator = [availableOps, smtBvWidths, intBitWidths,
+                      createValueOutOfThinAir](
                          MLIRContext &ctx, tree_guide::Chooser *chooser,
                          int seed) {
       int currentMaxNumOps = maxNumOps;
@@ -358,7 +376,8 @@ int main(int argc, char **argv) {
             chooser->choose(maxNumOps - minNumOps + 1) + minNumOps;
       }
       return createProgram(
-          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          ctx, availableOps,
+          getAvailableTypes(ctx, configuration, smtBvWidths, intBitWidths),
           getAvailableAttributes(ctx, configuration), chooser, currentMaxNumOps,
           maxNumArgs, seed, createValueOutOfThinAir, currentExactSize);
     };
@@ -401,7 +420,8 @@ int main(int argc, char **argv) {
     programCreator = [=](MLIRContext &ctx, tree_guide::Chooser *chooser,
                          int seed) {
       return createProgramWithBuildingBlocks(
-          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          ctx, availableOps,
+          getAvailableTypes(ctx, configuration, smtBvWidths, intBitWidths),
           getAvailableAttributes(ctx, configuration), blocks, chooser,
           maxNumOps, maxNumArgs, seed);
     };
