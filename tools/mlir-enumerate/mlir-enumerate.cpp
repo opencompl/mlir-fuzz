@@ -34,6 +34,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
 
@@ -45,6 +46,14 @@ int main(int argc, char **argv) {
   // The IRDL file containing the dialects that we want to generate
   static llvm::cl::opt<std::string> inputFilename(
       llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
+
+  // The folder in which to store the generated programs, one file per program.
+  static llvm::cl::opt<std::string> outputFolder(
+      "o",
+      llvm::cl::desc("Folder in which to store each generated program in its "
+                     "own file. If not specified, print all programs to "
+                     "stdout, separated by '// -----'"),
+      llvm::cl::value_desc("folder"), llvm::cl::init(""));
 
   // Expect a new line before printing the next program.
   static llvm::cl::opt<bool> pauseBetweenPrograms(
@@ -453,6 +462,14 @@ int main(int argc, char **argv) {
     };
   }
 
+  if (!outputFolder.empty()) {
+    if (auto ec = llvm::sys::fs::create_directories(outputFolder)) {
+      llvm::errs() << "Unable to create output folder " << outputFolder << ": "
+                   << ec.message() << "\n";
+      return 1;
+    }
+  }
+
   // Get the list of illegal sub-patterns.
   RewritePatternSet illegals(&ctx);
   if (excludeSubpatterns != "/dev/null") {
@@ -569,7 +586,19 @@ int main(int argc, char **argv) {
     }
 
     correctProgramCounter += 1;
-    if (!count) {
+    if (!count && !outputFolder.empty()) {
+      std::string outputFilename = outputFolder + "/generated-program" +
+                                   std::to_string(correctProgramCounter) +
+                                   ".mlir";
+      std::string errorMessage;
+      auto outputFile = openOutputFile(outputFilename, &errorMessage);
+      if (!outputFile) {
+        llvm::errs() << "Error opening output file: " << errorMessage << "\n";
+        return 1;
+      }
+      module->print(outputFile->os(), printingFlags);
+      outputFile->keep();
+    } else if (!count) {
       module->print(llvm::outs(), printingFlags);
       llvm::outs() << "// -----\n";
       llvm::outs().flush();
