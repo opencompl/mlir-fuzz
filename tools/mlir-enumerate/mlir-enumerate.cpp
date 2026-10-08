@@ -133,6 +133,13 @@ int main(int argc, char **argv) {
       "seed", llvm::cl::desc("Specify random seed used in generation"),
       llvm::cl::init(-1));
 
+  static llvm::cl::opt<bool> poison(
+      "poison",
+      llvm::cl::desc("In case the configuration is set to \"llvm\", also "
+                     "generate poison values wherever constants are "
+                     "generated"),
+      llvm::cl::init(false));
+
   static llvm::cl::opt<bool> allowUnusedArguments(
       "allow-unused-arguments",
       llvm::cl::desc("Allow unused arguments in the generated functions"),
@@ -330,8 +337,13 @@ int main(int argc, char **argv) {
           configuration == Configuration::LLVM &&
           mlir::isa<mlir::IntegerType>(type)) {
         auto values = getConstantValues(mlir::cast<IntegerType>(type));
-        auto valueAttr =
-            IntegerAttr::get(type, values[info.chooser->choose(values.size())]);
+        size_t choice = info.chooser->choose(values.size() + (poison ? 1 : 0));
+        if (choice == values.size()) {
+          auto poisonOp =
+              info.builder.create<LLVM::PoisonOp>(UnknownLoc::get(ctx), type);
+          return poisonOp.getResult();
+        }
+        auto valueAttr = IntegerAttr::get(type, values[choice]);
         auto typedValue = mlir::cast<TypedAttr>(valueAttr);
         auto constant = info.builder.create<LLVM::ConstantOp>(
             UnknownLoc::get(ctx), typedValue);
