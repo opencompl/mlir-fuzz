@@ -22,6 +22,12 @@ First create the generation dir: `mkdir generated`.
 enumerator with the `arith` dialect, and generate the programs in the
 `generated` folder.
 
+For programs with a single operation (`--max-num-ops=1 --exact-size`),
+`--descriptive-names` names each file after its content, as
+`<op>/<type>/<op>[_<flags>]_<type>_<operands>.mlir`. Constants are written as
+unsigned bit patterns, and arguments as `a<N>`, for example
+`add/i3/add_nsw_i3_4_poison.mlir`.
+
 ## Testing MLIR code with xDSL-smt
 
 The [`xdsl-smt`](https://github.com/opencompl/xdsl-smt) project has a

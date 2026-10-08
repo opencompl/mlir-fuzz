@@ -24,6 +24,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
@@ -33,13 +34,94 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 using namespace mlir;
 using namespace irdl;
+
+/// Name a leaf operand: a function argument, an integer constant (printed as
+/// its unsigned bit pattern), or poison.
+static std::string getOperandName(Value value) {
+  if (auto arg = mlir::dyn_cast<BlockArgument>(value))
+    return "a" + std::to_string(arg.getArgNumber());
+  APInt constant;
+  if (matchPattern(value, m_ConstantInt(&constant)))
+    return llvm::toString(constant, 10, /*Signed=*/false);
+  if (value.getDefiningOp<LLVM::PoisonOp>())
+    return "poison";
+  return "v";
+}
+
+static std::string typeToString(Type type) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  type.print(os);
+  return str;
+}
+
+/// Get a name describing a program that contains a single non-constant
+/// operation, as a relative path of the form
+/// `<op>/<type>/<op>[_<flags>]_<type>_<operands>`. Return std::nullopt if
+/// the program does not have exactly one non-constant operation.
+static std::optional<std::string> getDescriptiveName(ModuleOp module) {
+  Operation *mainOp = nullptr;
+  bool hasSingleOp = true;
+  module.walk([&](Operation *op) {
+    if (mlir::isa<ModuleOp, func::FuncOp, func::ReturnOp, LLVM::PoisonOp>(
+            op) ||
+        op->hasTrait<OpTrait::ConstantLike>())
+      return;
+    if (mainOp)
+      hasSingleOp = false;
+    mainOp = op;
+  });
+  if (!mainOp || !hasSingleOp || mainOp->getNumOperands() == 0 ||
+      mainOp->getNumResults() != 1)
+    return std::nullopt;
+
+  std::string opName = mainOp->getName().stripDialect().str();
+
+  std::vector<std::string> flags;
+  if (auto cmp = mlir::dyn_cast<LLVM::ICmpOp>(mainOp))
+    flags.push_back(LLVM::stringifyICmpPredicate(cmp.getPredicate()).str());
+  if (auto op = mlir::dyn_cast<LLVM::IntegerOverflowFlagsInterface>(mainOp)) {
+    if (op.hasNoSignedWrap())
+      flags.push_back("nsw");
+    if (op.hasNoUnsignedWrap())
+      flags.push_back("nuw");
+  }
+  if (auto op = mlir::dyn_cast<LLVM::ExactFlagInterface>(mainOp))
+    if (op.getIsExact())
+      flags.push_back("exact");
+  if (auto op = mlir::dyn_cast<LLVM::DisjointFlagInterface>(mainOp))
+    if (op.getIsDisjoint())
+      flags.push_back("disjoint");
+  if (auto op = mlir::dyn_cast<LLVM::NonNegFlagInterface>(mainOp))
+    if (op.getNonNeg())
+      flags.push_back("nneg");
+
+  // Use the type of the last operand, which is the value type for binary
+  // operations, comparisons, and select. Casts also mention the result type.
+  Type operandType = mainOp->getOperands().back().getType();
+  Type resultType = mainOp->getResult(0).getType();
+  std::string typeName = typeToString(operandType);
+  if (mainOp->getNumOperands() == 1 && operandType != resultType)
+    typeName += "_to_" + typeToString(resultType);
+
+  std::string name = opName;
+  for (auto &flag : flags)
+    name += "_" + flag;
+  name += "_" + typeName;
+  for (Value operand : mainOp->getOperands())
+    name += "_" + getOperandName(operand);
+
+  return opName + "/" + typeName + "/" + name;
+}
 
 int main(int argc, char **argv) {
 
@@ -54,6 +136,15 @@ int main(int argc, char **argv) {
                      "own file. If not specified, print all programs to "
                      "stdout, separated by '// -----'"),
       llvm::cl::value_desc("folder"), llvm::cl::init(""));
+
+  // Name each output file after the content of the program.
+  static llvm::cl::opt<bool> descriptiveNames(
+      "descriptive-names",
+      llvm::cl::desc("When used with -o, name each file after its content, as "
+                     "<op>/<type>/<op>[_<flags>]_<type>_<operands>.mlir. "
+                     "Programs that do not have exactly one non-constant "
+                     "operation are named generated-program<N>.mlir"),
+      llvm::cl::init(false));
 
   // Expect a new line before printing the next program.
   static llvm::cl::opt<bool> pauseBetweenPrograms(
@@ -505,6 +596,8 @@ int main(int argc, char **argv) {
       std::forward<RewritePatternSet>(illegals));
 
   size_t correctProgramCounter = 0;
+  llvm::StringMap<unsigned> descriptiveNameUses;
+  size_t duplicateNames = 0;
 
   // set seed to a random positive integer
   if (seed == -1) {
@@ -590,6 +683,25 @@ int main(int argc, char **argv) {
       std::string outputFilename = outputFolder + "/generated-program" +
                                    std::to_string(correctProgramCounter) +
                                    ".mlir";
+      if (descriptiveNames) {
+        if (auto name = getDescriptiveName(*module)) {
+          // Two programs with the same name are only possible if the
+          // generator emits the same program twice, or if the program has
+          // attributes that are not part of the name. Keep both.
+          unsigned uses = descriptiveNameUses[*name]++;
+          if (uses > 0) {
+            *name += "_dup" + std::to_string(uses);
+            duplicateNames++;
+          }
+          outputFilename = outputFolder + "/" + *name + ".mlir";
+          if (auto ec = llvm::sys::fs::create_directories(
+                  llvm::sys::path::parent_path(outputFilename))) {
+            llvm::errs() << "Unable to create folder for " << outputFilename
+                         << ": " << ec.message() << "\n";
+            return 1;
+          }
+        }
+      }
       std::string errorMessage;
       auto outputFile = openOutputFile(outputFilename, &errorMessage);
       if (!outputFile) {
@@ -614,6 +726,11 @@ int main(int argc, char **argv) {
         break;
     }
   }
+
+  if (duplicateNames > 0)
+    llvm::errs() << "Warning: " << duplicateNames
+                 << " programs had the same descriptive name as an earlier "
+                    "program and got a _dup<N> suffix\n";
 
   if (count) {
     llvm::outs() << correctProgramCounter;
