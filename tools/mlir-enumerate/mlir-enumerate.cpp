@@ -15,6 +15,7 @@
 #include "IRDLUtils.h"
 
 #include "mlir/Conversion/PDLToPDLInterp/PDLToPDLInterp.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLVerifiers.h"
@@ -23,6 +24,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/InitAllDialects.h"
@@ -32,18 +34,117 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 using namespace mlir;
 using namespace irdl;
+
+/// Name a leaf operand: a function argument, an integer constant (printed as
+/// its unsigned bit pattern), or poison.
+static std::string getOperandName(Value value) {
+  if (auto arg = mlir::dyn_cast<BlockArgument>(value))
+    return "a" + std::to_string(arg.getArgNumber());
+  APInt constant;
+  if (matchPattern(value, m_ConstantInt(&constant)))
+    return llvm::toString(constant, 10, /*Signed=*/false);
+  if (value.getDefiningOp<LLVM::PoisonOp>())
+    return "poison";
+  return "v";
+}
+
+static std::string typeToString(Type type) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  type.print(os);
+  return str;
+}
+
+/// Get a name describing a program that contains a single non-constant
+/// operation, as a relative path of the form
+/// `<op>/<type>/<op>[_<flags>]_<type>_<operands>`. Return std::nullopt if
+/// the program does not have exactly one non-constant operation.
+static std::optional<std::string> getDescriptiveName(ModuleOp module) {
+  Operation *mainOp = nullptr;
+  bool hasSingleOp = true;
+  module.walk([&](Operation *op) {
+    if (mlir::isa<ModuleOp, func::FuncOp, func::ReturnOp, LLVM::PoisonOp>(
+            op) ||
+        op->hasTrait<OpTrait::ConstantLike>())
+      return;
+    if (mainOp)
+      hasSingleOp = false;
+    mainOp = op;
+  });
+  if (!mainOp || !hasSingleOp || mainOp->getNumOperands() == 0 ||
+      mainOp->getNumResults() != 1)
+    return std::nullopt;
+
+  std::string opName = mainOp->getName().stripDialect().str();
+
+  std::vector<std::string> flags;
+  if (auto cmp = mlir::dyn_cast<LLVM::ICmpOp>(mainOp))
+    flags.push_back(LLVM::stringifyICmpPredicate(cmp.getPredicate()).str());
+  if (auto op = mlir::dyn_cast<LLVM::IntegerOverflowFlagsInterface>(mainOp)) {
+    if (op.hasNoSignedWrap())
+      flags.push_back("nsw");
+    if (op.hasNoUnsignedWrap())
+      flags.push_back("nuw");
+  }
+  if (auto op = mlir::dyn_cast<LLVM::ExactFlagInterface>(mainOp))
+    if (op.getIsExact())
+      flags.push_back("exact");
+  if (auto op = mlir::dyn_cast<LLVM::DisjointFlagInterface>(mainOp))
+    if (op.getIsDisjoint())
+      flags.push_back("disjoint");
+  if (auto op = mlir::dyn_cast<LLVM::NonNegFlagInterface>(mainOp))
+    if (op.getNonNeg())
+      flags.push_back("nneg");
+
+  // Use the type of the last operand, which is the value type for binary
+  // operations, comparisons, and select. Casts also mention the result type.
+  Type operandType = mainOp->getOperands().back().getType();
+  Type resultType = mainOp->getResult(0).getType();
+  std::string typeName = typeToString(operandType);
+  if (mainOp->getNumOperands() == 1 && operandType != resultType)
+    typeName += "_to_" + typeToString(resultType);
+
+  std::string name = opName;
+  for (auto &flag : flags)
+    name += "_" + flag;
+  name += "_" + typeName;
+  for (Value operand : mainOp->getOperands())
+    name += "_" + getOperandName(operand);
+
+  return opName + "/" + typeName + "/" + name;
+}
 
 int main(int argc, char **argv) {
 
   // The IRDL file containing the dialects that we want to generate
   static llvm::cl::opt<std::string> inputFilename(
       llvm::cl::Positional, llvm::cl::desc("<IRDL file>"), llvm::cl::init("-"));
+
+  // The folder in which to store the generated programs, one file per program.
+  static llvm::cl::opt<std::string> outputFolder(
+      "o",
+      llvm::cl::desc("Folder in which to store each generated program in its "
+                     "own file. If not specified, print all programs to "
+                     "stdout, separated by '// -----'"),
+      llvm::cl::value_desc("folder"), llvm::cl::init(""));
+
+  // Name each output file after the content of the program.
+  static llvm::cl::opt<bool> descriptiveNames(
+      "descriptive-names",
+      llvm::cl::desc("When used with -o, name each file after its content, as "
+                     "<op>/<type>/<op>[_<flags>]_<type>_<operands>.mlir. "
+                     "Programs that do not have exactly one non-constant "
+                     "operation are named generated-program<N>.mlir"),
+      llvm::cl::init(false));
 
   // Expect a new line before printing the next program.
   static llvm::cl::opt<bool> pauseBetweenPrograms(
@@ -132,6 +233,13 @@ int main(int argc, char **argv) {
       "seed", llvm::cl::desc("Specify random seed used in generation"),
       llvm::cl::init(-1));
 
+  static llvm::cl::opt<bool> poison(
+      "poison",
+      llvm::cl::desc("In case the configuration is set to \"llvm\", also "
+                     "generate poison values wherever constants are "
+                     "generated"),
+      llvm::cl::init(false));
+
   static llvm::cl::opt<bool> allowUnusedArguments(
       "allow-unused-arguments",
       llvm::cl::desc("Allow unused arguments in the generated functions"),
@@ -190,6 +298,14 @@ int main(int argc, char **argv) {
                      "this corresponds to no BitVector instructions."),
       llvm::cl::init(""));
 
+  static llvm::cl::opt<std::string> intWidths(
+      "int-widths",
+      llvm::cl::desc("In case the configuration is set to \"arith\", "
+                     "\"comb\", or \"llvm\", this is a list of "
+                     "comma-separated integer bitwidths replacing the default "
+                     "integer types."),
+      llvm::cl::init(""));
+
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR enumerator");
 
@@ -206,6 +322,15 @@ int main(int argc, char **argv) {
     std::string width;
     while (std::getline(ss, width, ',')) {
       smtBvWidths.push_back(std::stoi(width));
+    }
+  }
+
+  std::vector<unsigned> intBitWidths;
+  {
+    std::stringstream ss(intWidths);
+    std::string width;
+    while (std::getline(ss, width, ',')) {
+      intBitWidths.push_back(std::stoi(width));
     }
   }
 
@@ -245,9 +370,25 @@ int main(int argc, char **argv) {
       return WalkResult::advance();
     });
 
+    // Get the distinct values of the given integer type that are in the range
+    // [min-constant-value, max-constant-value], after truncation to the type
+    // bitwidth.
+    auto getConstantValues = [](IntegerType type) {
+      std::vector<APInt> values;
+      for (int64_t value = minConstantValue; value <= maxConstantValue;
+           ++value) {
+        APInt apValue =
+            APInt(64, value, /*isSigned=*/true).sextOrTrunc(type.getWidth());
+        if (!llvm::is_contained(values, apValue))
+          values.push_back(apValue);
+      }
+      return values;
+    };
+
     auto createValueOutOfThinAir =
-        [&smtBvWidths, constantName](GeneratorInfo &info,
-                                     Type type) -> std::optional<Value> {
+        [&smtBvWidths, constantName,
+         getConstantValues](GeneratorInfo &info,
+                            Type type) -> std::optional<Value> {
       auto *ctx = info.builder.getContext();
       auto func = llvm::cast<mlir::func::FuncOp>(
           *info.builder.getInsertionBlock()->getParentOp());
@@ -283,10 +424,9 @@ int main(int argc, char **argv) {
       if (constantKind == ConstantKind::Constant &&
           configuration == Configuration::Arith &&
           mlir::isa<mlir::IntegerType>(type)) {
-        int64_t value =
-            info.chooser->choose(maxConstantValue - minConstantValue + 1) +
-            minConstantValue;
-        auto valueAttr = IntegerAttr::get(type, value);
+        auto values = getConstantValues(mlir::cast<IntegerType>(type));
+        auto valueAttr =
+            IntegerAttr::get(type, values[info.chooser->choose(values.size())]);
         auto typedValue = mlir::cast<TypedAttr>(valueAttr);
         auto constant = info.builder.create<arith::ConstantOp>(
             UnknownLoc::get(ctx), typedValue);
@@ -296,10 +436,14 @@ int main(int argc, char **argv) {
       if (constantKind == ConstantKind::Constant &&
           configuration == Configuration::LLVM &&
           mlir::isa<mlir::IntegerType>(type)) {
-        int64_t value =
-            info.chooser->choose(maxConstantValue - minConstantValue + 1) +
-            minConstantValue;
-        auto valueAttr = IntegerAttr::get(type, value);
+        auto values = getConstantValues(mlir::cast<IntegerType>(type));
+        size_t choice = info.chooser->choose(values.size() + (poison ? 1 : 0));
+        if (choice == values.size()) {
+          auto poisonOp =
+              info.builder.create<LLVM::PoisonOp>(UnknownLoc::get(ctx), type);
+          return poisonOp.getResult();
+        }
+        auto valueAttr = IntegerAttr::get(type, values[choice]);
         auto typedValue = mlir::cast<TypedAttr>(valueAttr);
         auto constant = info.builder.create<LLVM::ConstantOp>(
             UnknownLoc::get(ctx), typedValue);
@@ -343,7 +487,8 @@ int main(int argc, char **argv) {
       }
     }
 
-    programCreator = [availableOps, smtBvWidths, createValueOutOfThinAir](
+    programCreator = [availableOps, smtBvWidths, intBitWidths,
+                      createValueOutOfThinAir](
                          MLIRContext &ctx, tree_guide::Chooser *chooser,
                          int seed) {
       int currentMaxNumOps = maxNumOps;
@@ -357,7 +502,8 @@ int main(int argc, char **argv) {
             chooser->choose(maxNumOps - minNumOps + 1) + minNumOps;
       }
       return createProgram(
-          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          ctx, availableOps,
+          getAvailableTypes(ctx, configuration, smtBvWidths, intBitWidths),
           getAvailableAttributes(ctx, configuration), chooser, currentMaxNumOps,
           maxNumArgs, seed, createValueOutOfThinAir, currentExactSize);
     };
@@ -400,10 +546,19 @@ int main(int argc, char **argv) {
     programCreator = [=](MLIRContext &ctx, tree_guide::Chooser *chooser,
                          int seed) {
       return createProgramWithBuildingBlocks(
-          ctx, availableOps, getAvailableTypes(ctx, configuration, smtBvWidths),
+          ctx, availableOps,
+          getAvailableTypes(ctx, configuration, smtBvWidths, intBitWidths),
           getAvailableAttributes(ctx, configuration), blocks, chooser,
           maxNumOps, maxNumArgs, seed);
     };
+  }
+
+  if (!outputFolder.empty()) {
+    if (auto ec = llvm::sys::fs::create_directories(outputFolder)) {
+      llvm::errs() << "Unable to create output folder " << outputFolder << ": "
+                   << ec.message() << "\n";
+      return 1;
+    }
   }
 
   // Get the list of illegal sub-patterns.
@@ -441,6 +596,8 @@ int main(int argc, char **argv) {
       std::forward<RewritePatternSet>(illegals));
 
   size_t correctProgramCounter = 0;
+  llvm::StringMap<unsigned> descriptiveNameUses;
+  size_t duplicateNames = 0;
 
   // set seed to a random positive integer
   if (seed == -1) {
@@ -475,6 +632,20 @@ int main(int argc, char **argv) {
         continue;
     }
 
+    // The LLVM dialect verifier does not check that trunc reduces the
+    // bitwidth, which LLVM IR requires.
+    auto isInvalidTrunc = [](LLVM::TruncOp op) {
+      auto srcType = mlir::dyn_cast<IntegerType>(op.getArg().getType());
+      auto dstType = mlir::dyn_cast<IntegerType>(op.getType());
+      if (!srcType || !dstType)
+        return WalkResult::advance();
+      if (dstType.getWidth() >= srcType.getWidth())
+        return WalkResult::interrupt();
+      return WalkResult::advance();
+    };
+    if (module->walk(isInvalidTrunc).wasInterrupted())
+      continue;
+
     // Optionally run CSE
     if (cse) {
       auto pm = PassManager::on<ModuleOp>(&ctx);
@@ -487,9 +658,11 @@ int main(int argc, char **argv) {
     }
 
     // Make sure the program does not contain an illegal subpattern.
-    if (applyPatternsGreedily(
-            module->getBodyRegion(), frozenIllegals,
-            {.maxIterations = 1, .maxNumRewrites = 1, .fold = false})
+    if (applyPatternsGreedily(module->getBodyRegion(), frozenIllegals,
+                              GreedyRewriteConfig()
+                                  .setMaxIterations(1)
+                                  .setMaxNumRewrites(1)
+                                  .enableFolding(false))
             .failed()) {
       // If there is a fail, that means we matched the pattern, and apply the
       // rewrite (which does nothing). Since the rewrite does nothing, the
@@ -506,7 +679,38 @@ int main(int argc, char **argv) {
     }
 
     correctProgramCounter += 1;
-    if (!count) {
+    if (!count && !outputFolder.empty()) {
+      std::string outputFilename = outputFolder + "/generated-program" +
+                                   std::to_string(correctProgramCounter) +
+                                   ".mlir";
+      if (descriptiveNames) {
+        if (auto name = getDescriptiveName(*module)) {
+          // Two programs with the same name are only possible if the
+          // generator emits the same program twice, or if the program has
+          // attributes that are not part of the name. Keep both.
+          unsigned uses = descriptiveNameUses[*name]++;
+          if (uses > 0) {
+            *name += "_dup" + std::to_string(uses);
+            duplicateNames++;
+          }
+          outputFilename = outputFolder + "/" + *name + ".mlir";
+          if (auto ec = llvm::sys::fs::create_directories(
+                  llvm::sys::path::parent_path(outputFilename))) {
+            llvm::errs() << "Unable to create folder for " << outputFilename
+                         << ": " << ec.message() << "\n";
+            return 1;
+          }
+        }
+      }
+      std::string errorMessage;
+      auto outputFile = openOutputFile(outputFilename, &errorMessage);
+      if (!outputFile) {
+        llvm::errs() << "Error opening output file: " << errorMessage << "\n";
+        return 1;
+      }
+      module->print(outputFile->os(), printingFlags);
+      outputFile->keep();
+    } else if (!count) {
       module->print(llvm::outs(), printingFlags);
       llvm::outs() << "// -----\n";
       llvm::outs().flush();
@@ -522,6 +726,11 @@ int main(int argc, char **argv) {
         break;
     }
   }
+
+  if (duplicateNames > 0)
+    llvm::errs() << "Warning: " << duplicateNames
+                 << " programs had the same descriptive name as an earlier "
+                    "program and got a _dup<N> suffix\n";
 
   if (count) {
     llvm::outs() << correctProgramCounter;

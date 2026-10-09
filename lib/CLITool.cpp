@@ -13,8 +13,17 @@
 using namespace mlir;
 
 std::vector<Type> getAvailableTypes(MLIRContext &ctx, Configuration config,
-                                    std::vector<unsigned> smtBvWidths) {
+                                    std::vector<unsigned> smtBvWidths,
+                                    std::vector<unsigned> intWidths) {
   Builder builder(&ctx);
+  if (!intWidths.empty() &&
+      (config == Configuration::Arith || config == Configuration::Comb ||
+       config == Configuration::LLVM)) {
+    std::vector<Type> types;
+    for (unsigned width : intWidths)
+      types.push_back(builder.getIntegerType(width));
+    return types;
+  }
   switch (config) {
   case Configuration::Arith:
   case Configuration::Comb:
